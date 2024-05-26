@@ -1,10 +1,15 @@
 ifndef CAKEDIR
-CAKEDIR = ../../cakeml
+CAKEDIR = ../../cakeml-2274
+endif
+
+ifndef CHOREODIR
+CHOREODIR = ..
 endif
 
 
 INCLUDES = $(CAKEDIR)/misc $(CHOREODIR)/utils $(CAKEDIR)/semantics \
-	   $(HOLDIR)/examples/formal-languages/regular
+	   $(HOLDIR)/examples/formal-languages/regular \
+	   $(CHOREODIR)/richerlang
 
 all: $(DEFAULT_TARGETS)
 .PHONY: all

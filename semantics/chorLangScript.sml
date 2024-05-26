@@ -1,4 +1,4 @@
-open preamble;
+open preamble richerLangTheory;
 
 val _ = new_theory "chorLang";
 
@@ -39,8 +39,8 @@ val _ = Datatype`
         *)
 
        (* Scope *)
-       |  Let varN proc (datum list -> datum) (varN list) chor
-       (* Let e    p    f                     args        C
+       |  Let varN proc exp chor
+       (* Let e    p    computation        C
           Eg:
               let e@p = f args in C
         *)
@@ -66,7 +66,7 @@ Definition dsubst_def:
 ∧ dsubst (IfThen v p l r) dn c' = IfThen v p (dsubst l dn c') (dsubst r dn c')
 ∧ dsubst (Com p v1 q v2 c) dn c'  = Com p v1 q v2 (dsubst c dn c')
 ∧ dsubst (Sel p v q c) dn c'    = Sel p v q (dsubst c dn c')
-∧ dsubst (Let v p f l c) dn c'  = Let v p f l (dsubst c dn c')
+∧ dsubst (Let v p e c) dn c'  = Let v p e (dsubst c dn c')
 ∧ dsubst (Fix dn' c) dn c' =
    (if dn = dn' then
       Fix dn' c
@@ -83,7 +83,7 @@ Definition size_chor_def:
   size_chor Nil                = (1 : num)
 ∧ size_chor (Com _ _ _ _ c)    = 1 + size_chor c
 ∧ size_chor (Sel _ _ _ c)      = 1 + size_chor c
-∧ size_chor (Let _ _ _ _ c)    = 1 + size_chor c
+∧ size_chor (Let _ _ _ c)    = 1 + size_chor c (* still this size? *)
 ∧ size_chor (IfThen _ _ c1 c2) = 1 + size_chor c1 + size_chor c2
 ∧ size_chor (Fix dn c)         = 1 + size_chor c
 ∧ size_chor (Call dn)          = 1
