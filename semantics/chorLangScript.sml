@@ -8,7 +8,7 @@ val _ = type_abbrev( "dvarN" , ``: string``); (* Process definition variable *)
 
 val _ = type_abbrev( "proc" , ``: string``); (* TODO: list -> mlvector? *)
 
-val _ = type_abbrev( "datum" , ``: word8 list``); (* TODO: list -> mlvector? *)
+val _ = type_abbrev( "datum" , ``: exp value``); (* TODO: list -> mlvector? *)
 
 (* Datatype for terms *)
 val _ = Datatype`
@@ -40,7 +40,7 @@ val _ = Datatype`
 
        (* Scope *)
        |  Let varN proc exp chor
-       (* Let e    p    computation        C
+       (* Let e    p    e   C
           Eg:
               let e@p = f args in C
         *)
@@ -83,7 +83,7 @@ Definition size_chor_def:
   size_chor Nil                = (1 : num)
 ∧ size_chor (Com _ _ _ _ c)    = 1 + size_chor c
 ∧ size_chor (Sel _ _ _ c)      = 1 + size_chor c
-∧ size_chor (Let _ _ _ c)    = 1 + size_chor c (* still this size? *)
+∧ size_chor (Let _ _ _ c)      = 1 + size_chor c
 ∧ size_chor (IfThen _ _ c1 c2) = 1 + size_chor c1 + size_chor c2
 ∧ size_chor (Fix dn c)         = 1 + size_chor c
 ∧ size_chor (Call dn)          = 1

@@ -188,4 +188,9 @@ Overload value_size = “gen_value_size (K 0) (K 0) (K 0) (K 0)”
 Theorem value_size_thm =
         gen_value_size_def |> Q.SPECL [‘K 0’, ‘K 0’, ‘K 0’, ‘K 0’] |> SRULE[]
 
+Definition is_BoolV_def[simp]:
+  is_BoolV (BoolV _) = T ∧
+  is_BoolV _ = F
+End
+
 val _ = export_theory();

@@ -323,10 +323,11 @@ QED
 
 (* should be ⇔ *)
 Theorem valuetype_EQ_sumT:
-  ∀ v t1 t2. value_type v (sumT t1 t2) ⇒
+  ∀ v t1 t2. value_type v (sumT t1 t2) ⇔
              ∃ v0. v = SumLV v0 ∧ value_type v0 t1 ∨ v = SumRV v0 ∧ value_type v0 t2
 Proof
-  rw[Once value_type_cases]
+  rpt strip_tac >> iff_tac >- rw[Once value_type_cases]
+  >> strip_tac >> simp[]
 QED
 
 Theorem bop_type_soundness:

@@ -1,4 +1,4 @@
-open HolKernel Parse boolLib bossLib langTheory finite_mapTheory valueTheory;
+open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory;
 
 val _ = new_theory "envSem";
 
@@ -90,7 +90,7 @@ Proof
   [‘typecheck G e1 (fnT ity oty)’, ‘typecheck G e2 ity’]
   >- ( (* app *) rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> gvs[valuetype_EQ_fnT] >> first_x_assum $ drule_at (Pat ‘typecheck _ _ _’) >> metis_tac[envtype_lemma])
   >> ( (* case *) first_x_assum $ drule_all_then $ strip_assume_tac
-      >- (drule valuetype_EQ_sumT >> rw[]
+      >- (drule $ iffLR valuetype_EQ_sumT >> rw[]
           >- (‘envtype (G |+ (s1, t1)) (E |+ (s1, v0))’ by simp[envtype_lemma] >>
               first_x_assum $ drule_all_then $ strip_assume_tac >> simp[])
           >> ‘envtype (G |+ (s2, t2)) (E |+ (s2, v0))’ by simp[envtype_lemma] >>
