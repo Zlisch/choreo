@@ -1,4 +1,4 @@
-open preamble choreoUtilsTheory chorSemTheory chorLangTheory;
+open preamble choreoUtilsTheory chorSemTheory chorLangTheory richerLangTheory;
 
 val _ = new_theory "chorProps";
 
@@ -126,7 +126,7 @@ Proof
   \\ fs [lrm_def]
 QED
 
-(* An slightly more specific case of `lcong_lrm` *)
+(* A slightly more specific case of `lcong_lrm` *)
 Theorem lcong_cons_simp:
   ∀h l h' l'. h ≠ h' ∧ h :: l τ≅ h' :: l'
    ⇒ l τ≅ h' :: lrm l' h
@@ -222,8 +222,10 @@ QED
 (* Give a state and a transition tag, one can generate the resulting state *)
 Definition state_from_tag_def:
   state_from_tag s (LCom p1 v1 p2 v2) = (s |+ ((v2,p2),s ' (v1,p1)))
-∧ state_from_tag s (LLet v p f vl)  =
-    (s |+ ((v,p),f (MAP (THE ∘ FLOOKUP s) (MAP (λv. (v,p)) vl))))
+  ∧ state_from_tag s (LLet v p e r)  =
+    (case r of
+       Value ev => (s |+ ((v,p), ev))
+     | _ => s)
 ∧ state_from_tag s _ = s
 End
 
@@ -316,7 +318,7 @@ Definition free_variables_def:
   (free_variables (Call _) = {}) /\
   (free_variables (IfThen v p c1 c2) = {(v,p)} ∪ (free_variables c1 ∪ free_variables c2)) /\
   (free_variables (Com p1 v1 p2 v2 c) = {(v1,p1)} ∪ (free_variables c DELETE (v2,p2))) /\
-  (free_variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ (free_variables c DELETE (v,p))) /\
+  (free_variables (Let v p e c) = {(s, p) | s ∈ free_vars e} ∪ (free_variables c DELETE (v,p))) /\
   (free_variables (Sel p b q c) = free_variables c) /\
   (free_variables (Fix x c) = free_variables c)
 End
@@ -470,7 +472,7 @@ Definition no_self_comunication_def:
 ∧ no_self_comunication (Sel p _ q c)     = (p ≠ q ∧ no_self_comunication c)
 ∧ no_self_comunication (IfThen _ _ c c') = (no_self_comunication c ∧
                                             no_self_comunication c')
-∧ no_self_comunication (Let _ _ _ _ c)   = no_self_comunication c
+∧ no_self_comunication (Let _ _ _ c)     = no_self_comunication c
 ∧ no_self_comunication (Fix _ c)         = no_self_comunication c
 ∧ no_self_comunication _                 = T
 End
@@ -506,7 +508,7 @@ QED
 Definition chor_match_def:
   chor_match (LCom p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x'))
 ∧ chor_match (LSel p b q)    (Sel p' b' q' c)     = ((p,b,q)  = (p',b',q'))
-∧ chor_match (LLet v p f l)  (Let v' p' f' l' c)  = ((v,p,f,l) = (v',p',f',l'))
+∧ chor_match (LLet v p e)    (Let v' p' e' c)     = ((v,p,e) = (v',p',e'))
 ∧ chor_match (LTau p v)      (IfThen v' p' c1 c2) = ((p,v)     = (p',v'))
 ∧ chor_match  LFix           (Fix _ _)            = T
 ∧ chor_match  _              _                    = F
@@ -518,7 +520,7 @@ End
 Definition chor_tag_def:
   chor_tag (Com p v q x _)  = LCom p v q x
 ∧ chor_tag (Sel p b q _)    = LSel p b q
-∧ chor_tag (Let v p f l _)  = LLet v p f l
+∧ chor_tag (Let v p e _)    = LLet v p e
 ∧ chor_tag (IfThen v p _ _) = LTau p v
 ∧ chor_tag (Fix _ _)        = LFix
 End
@@ -533,12 +535,13 @@ Definition chor_tl_def:
 ∧ chor_tl s (Fix dn c)      = (s,dsubst c dn (Fix dn c))
 ∧ chor_tl s (Com p v q x c) = (s |+ ((x,q),(THE o FLOOKUP s) (v,p)),c)
 ∧ chor_tl s (Sel p b q c)   = (s,c)
-∧ chor_tl s (Let v p f l c) =
-    (s |+ ((v,p),f(MAP (THE o FLOOKUP s) (MAP (λv. (v,p)) l))),c)
+∧ chor_tl s (Let v p e c) =
+  (if ∃ cl. eval_exp cl (localise s p) e = Value ev then (s |+ ((v,p), ev),c)
+   else (s, Nil))
 ∧ chor_tl s (IfThen v p c1 c2) =
-    (if FLOOKUP s (v,p) = SOME [1w] then (s,c1)
-     else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w] then (s,c2)
-     else (s,IfThen v p c1 c2))
+    (if FLOOKUP s (v,p) = SOME (BoolV T) then (s,c1)
+     else if FLOOKUP s (v,p) = SOME (BoolV F) then (s,c2)
+     else (s, Nil))
 End
 
 (* Advances the choreography until the given tag
@@ -934,7 +937,7 @@ Definition variables_def:
   (variables (Fix x c) = variables c) /\
   (variables (IfThen v p c1 c2) = {(v,p)} ∪ (variables c1 ∪ variables c2)) /\
   (variables (Com p1 v1 p2 v2 c) = {(v1,p1);(v2,p2)} ∪ (variables c)) /\
-  (variables (Let v p f vl c) = set(MAP (λv. (v,p)) vl) ∪ {(v,p)} ∪ variables c) /\
+  (variables (Let v p e c) = {(s, p) | s ∈ free_vars e} ∪ {(v,p)} ∪ variables c) /\
   (variables (Sel p b q c) = variables c)
 End
 

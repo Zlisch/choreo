@@ -66,6 +66,20 @@ Proof
   Cases_on ‘m’>>simp[]
 QED
 
+Theorem result_bind_eq_exn:
+  result_bind m f = Exn exn ⇔ m = Exn exn ∨
+                              ∃ v. m = Value v ∧ f v = Exn exn
+Proof
+  Cases_on ‘m’>>simp[]
+QED
+
+Theorem result_bind_eq_typeerr:
+  result_bind m f = TypeError ⇔ m = TypeError ∨
+                              ∃ v. m = Value v ∧ f v = TypeError
+Proof
+  Cases_on ‘m’>>simp[]
+QED
+
 
 (* why >~[‘typecheck G (Case e arg1 e1 arg2 e2)’] doesn't work ... *)
 Theorem type_soundness:
@@ -97,6 +111,48 @@ Proof
           first_x_assum $ drule_all_then $ strip_assume_tac >> simp[])
       >> simp[])
 QED
+
+Theorem clock_value_increment:
+  ∀ cl0 E e v. eval_exp cl0 E e = Value v ⇒
+               (∀ cl1. cl1 ≥ cl0 ⇒ eval_exp cl1 E e = Value v)
+Proof
+  recInduct eval_exp_ind >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_value, PULL_EXISTS]
+QED
+
+Theorem clock_exn_increment:
+  ∀ cl0 E e exn. eval_exp cl0 E e = Exn exn ⇒
+                 (∀ cl1. cl1 ≥ cl0 ⇒ eval_exp cl1 E e = Exn exn)
+Proof
+  recInduct eval_exp_ind >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_exn, PULL_EXISTS] >~
+  [‘eval_exp (c-1) _ _ = Exn exn’]
+  >- (‘eval_exp cl1 E e1 = Value (Clos s e E1)’ by metis_tac[clock_value_increment] >> simp[] >>
+      ‘eval_exp cl1 E e2 = Value v2’ by metis_tac[clock_value_increment] >> simp[])
+  >> metis_tac [clock_value_increment]
+QED
+
+Theorem clock_typeerr_increment:
+  ∀ cl0 E e. eval_exp cl0 E e = TypeError ⇒
+             (∀ cl1. cl1 ≥ cl0 ⇒ eval_exp cl1 E e = TypeError)
+Proof
+  recInduct eval_exp_ind >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_typeerr, PULL_EXISTS] >~
+  [‘eval_exp c E e1 = Value (Clos s e E1)’, ‘eval_exp c E e2 = Value v2’, ‘eval_exp (c − 1) (E1 |+ (s,v2)) e = TypeError’]
+  >- (‘eval_exp cl1 E e1 = Value (Clos s e E1)’ by metis_tac[clock_value_increment] >> simp[] >>
+      ‘eval_exp cl1 E e2 = Value v2’ by metis_tac[clock_value_increment] >> simp[])
+  >> metis_tac [clock_value_increment]
+QED
+
+Theorem clock_increment:
+  ∀ cl0 E e r. eval_exp cl0 E e = r ∧ r ≠ Timeout ⇒               
+               (∀ cl1. cl1 ≥ cl0 ⇒ eval_exp cl1 E e = r)
+Proof
+  Cases_on ‘r’ >> simp[] >> metis_tac[clock_value_increment, clock_exn_increment, clock_typeerr_increment]
+QED
+
+(*
+Theorem clock_decrement:
+Proof
+*)
+
 
 val _ = export_theory();
 

@@ -9,7 +9,7 @@ Datatype:
         | LFix
         | LCom proc varN proc varN
         | LSel proc bool proc
-        | LLet varN proc exp
+        | LLet varN proc exp result
 End
 
 Definition freeprocs_def:
@@ -146,10 +146,6 @@ val [lcong_sym,lcong_refl,lcong_trans,lcong_reord] =
     zip ["lcong_sym","lcong_refl","lcong_trans","lcong_reord"]
         (CONJUNCTS lcong_rules) |> map save_thm;
 
-Definition localise_def:
-  localise s p = s f_o (λvn. (vn, p))
-End
-
 Inductive trans:
 [~com:]
   (* Communication *)
@@ -167,7 +163,6 @@ Inductive trans:
     ⇒ trans (s,Sel p1 b p2 c) (LSel p1 b p2,[]) (s,c))
 
 [~letval:]
-  (* Let *)
   (∀s v p e c cl.
     eval_exp cl (localise s p) e = Value ev
     ⇒ trans (s,Let v p e c)
@@ -175,7 +170,6 @@ Inductive trans:
             (s |+ ((v,p), ev),c))
 
 [~letexn:]
-  (* Let *)
   (∀s v p e c cl exn.
     eval_exp cl (localise s p) e = Exn exn
     ⇒ trans (s,Let v p e c)

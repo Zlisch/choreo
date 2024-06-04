@@ -89,5 +89,9 @@ Definition size_chor_def:
 ∧ size_chor (Call dn)          = 1
 End
 
+Definition localise_def:
+  localise s p = s f_o (λvn. (vn, p))
+End
+
 
 val _ = export_theory ()

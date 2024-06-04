@@ -321,7 +321,6 @@ Proof
   simp[Once value_type_cases]
 QED
 
-(* should be ⇔ *)
 Theorem valuetype_EQ_sumT:
   ∀ v t1 t2. value_type v (sumT t1 t2) ⇔
              ∃ v0. v = SumLV v0 ∧ value_type v0 t1 ∨ v = SumRV v0 ∧ value_type v0 t2
