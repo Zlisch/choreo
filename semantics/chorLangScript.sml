@@ -1,4 +1,4 @@
-open preamble richerLangTheory;
+open preamble richerLangTheory envSemTheory;
 
 val _ = new_theory "chorLang";
 
@@ -88,10 +88,5 @@ Definition size_chor_def:
 ∧ size_chor (Fix dn c)         = 1 + size_chor c
 ∧ size_chor (Call dn)          = 1
 End
-
-Definition localise_def:
-  localise s p = s f_o (λvn. (vn, p))
-End
-
 
 val _ = export_theory ()

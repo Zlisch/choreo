@@ -11,7 +11,7 @@ Definition toCong_def:
   toCong (LTau p v)      = SOME (LTau p NONE)
 ∧ toCong (LCom p v q v') = SOME (LCom p v q v')
 ∧ toCong (LSel p b q)    = SOME (LSel p b q)
-∧ toCong (LLet v p f vl) = SOME (LTau p (SOME v))
+∧ toCong (LLet v p e r)  = SOME (LTau p (SOME v))
 ∧ toCong _               = NONE
 End
 
@@ -25,19 +25,19 @@ Definition chorTrm_def:
 ∧ chorTrm s (LSel p b q) (Sel p' b' q' c) =
     (if (p,b,q) = (p',b',q') then c
      else Sel p' b' q' (chorTrm s (LSel p b q) c))
-∧ chorTrm s (LLet v p f vl) (Let v' p' f' vl' c) =
-    (if (v,p,f,vl) = (v',p',f',vl') then c
-     else Let v' p' f' vl' (chorTrm s (LLet v p f vl) c))
+∧ chorTrm s (LLet v p e r) (Let v' p' e' c) =
+    (if (v,p,e) = (v',p',e') then c
+     else Let v' p' e' (chorTrm s (LLet v p e r) c))
 ∧ chorTrm s (LTau p v) (IfThen v' p' c1 c2) =
     (if (p,v) = (p',v')
-     then if FLOOKUP s (v,p) = SOME [1w] then c1
-          else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w] then c2
+     then if FLOOKUP s (v,p) = SOME (BoolV T) then c1
+          else if FLOOKUP s (v,p) = SOME (BoolV F) then c2
           else IfThen v' p' c1 c2 (* Imposible? *)
      else IfThen v' p' (chorTrm s (LTau p v) c1) (chorTrm s (LTau p v) c2))
 ∧ chorTrm s LFix (Fix x c)         = dsubst c x (Fix x c)
 ∧ chorTrm s τ (Com p' v' q' x' c)  = Com p' v' q' x' (chorTrm s τ c)
 ∧ chorTrm s τ (Sel p' b' q' c)     = Sel p' b' q' (chorTrm s τ c)
-∧ chorTrm s τ (Let v' p' f' vl' c) = Let v' p' f' vl' (chorTrm s τ c)
+∧ chorTrm s τ (Let v' p' e' c)     = Let v' p' e' (chorTrm s τ c)
 ∧ chorTrm s τ (IfThen v' p' c1 c2) = IfThen v' p' (chorTrm s τ c1) (chorTrm s τ c2)
 ∧ chorTrm s τ (Fix x c)            = (Fix x c)
 ∧ chorTrm s τ (Call x)             = (Call x)
@@ -103,15 +103,15 @@ QED
 
 (* Unfolding does not re-arrange let-bindings *)
 Theorem Let_flcong:
-  ∀p v f vl c c'.
-    Let v p f vl c ≅⟩ c'
-    ⇒ ∃c''. c' = Let v p f vl c'' ∧ c ≅⟩ c''
+  ∀p v e c c'.
+    Let v p e c ≅⟩ c'
+    ⇒ ∃c''. c' = Let v p e c'' ∧ c ≅⟩ c''
 Proof
   ‘∀c1 c2.
      c1 ≅⟩ c2
-     ⇒ ∀v p f vl c.
-         c1 = Let v p f vl c
-         ⇒ ∃c'. c2 = Let v p f vl c' ∧ c ≅⟩ c'’
+     ⇒ ∀v p e c.
+         c1 = Let v p e c
+         ⇒ ∃c'. c2 = Let v p e c' ∧ c ≅⟩ c'’
   suffices_by metis_tac []
   \\ ho_match_mp_tac flcong_strongind
   \\ rw [flcong_rules]
@@ -334,8 +334,8 @@ Proof
       \\ metis_tac [lncong_rules,flcong_rules])
   >- (dxrule Let_flcong \\ dxrule Let_flcong \\ rw []
       \\ first_x_assum drule_all \\ rw []
-      \\ qexists_tac ‘Let v p f vl c’
-      \\ qexists_tac ‘Let v p f vl c'’
+      \\ qexists_tac ‘Let v p e c’
+      \\ qexists_tac ‘Let v p e c'’
       \\ metis_tac [lncong_rules,flcong_rules])
   >- (dxrule Com_flcong \\ dxrule Com_flcong \\ rw []
       \\ first_x_assum drule_all \\ rw []
@@ -486,7 +486,7 @@ Proof
       val check_trans   = qpat_assum `trans _ _ _` (K ALL_TAC)
       val list_of_trans = [`trans (_, Com _ _ _ _ _) _ _`
                           ,`trans (_, Sel _ _ _ _) _ _`
-                          ,`trans (_, Let _ _ _ _ _) _ _`
+                          ,`trans (_, Let _ _ _ _) _ _`
                           ,`trans (_, IfThen _ _ _ _) _ _`]
       val check_forall = qpat_assum `∀s s' τ. (∃l c2. trans _ _ _)
                                                 ⇔ ∃l' c2. trans _ _ _` (K ALL_TAC)
@@ -694,9 +694,9 @@ QED
 
 (* Unfolding transitions can jump over let bindings *)
 Theorem trans_unfold_let_swap:
-  ∀s c c' v p f vl.
+  ∀s c c' v p e.
     trans_unfold (s,c) (s,c')
-    ⇒ trans_unfold (s,Let v p f vl c) (s,Let v p f vl c')
+    ⇒ trans_unfold (s,Let v p e c) (s,Let v p e c')
 Proof
   rw [trans_unfold_def]
   \\ qmatch_goalsub_abbrev_tac ‘RTC r0 (s,com c)’
@@ -718,7 +718,7 @@ Proof
   \\ drule trans_LFix_state \\ rw []
   \\ qmatch_asmsub_rename_tac ‘RTC _ _ (s,_ c'')’
   \\ ho_match_mp_tac RTC_TRANS
-  \\ qexists_tac ‘(s,Let v p f vl c')’
+  \\ qexists_tac ‘(s,Let v p e c')’
   \\ rw [trans_let_swap,chorSemTheory.freeprocs_def]
 QED
 
@@ -895,7 +895,7 @@ Proof
      \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def,RTC_REFL])
   >- (EVERY (map Q.EXISTS_TAC [`[]`,`LSel p1 b p2`,‘Sel p1 b p2 c'’,`c'`,`c'`])
      \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def])
-  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LLet v p f vl`,‘Let v p f vl c'’,`c'`,`c'`])
+  >- (EVERY (map Q.EXISTS_TAC [`[]`,`LLet v p e r`,‘Let v p e c'’,`c'`,`c'`])
      \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def])
   >- (EVERY (map Q.EXISTS_TAC [`[]`,`LTau p v`,‘IfThen v p c' c2’,`c'`,`c'`])
      \\ rw [lncong_rules,trans_rules,toCong_def,trans_unfold_def])

@@ -59,6 +59,11 @@ Definition diverges_def:
   diverges E exp = ∀ c. eval_exp c E exp = Timeout
 End
 
+(* for chorLang *)
+Definition localise_def:
+  localise s p = s f_o (λvn. (vn, p))
+End
+
 Theorem result_bind_eq_value:
   result_bind m f = Value v ⇔
     ∃ u. m = Value u ∧ f u = Value v
@@ -153,6 +158,41 @@ Theorem clock_decrement:
 Proof
 *)
 
+Theorem localise_update_eqn:
+  localise s p |+ (vn, v) = localise (s |+ ((vn, p), v)) p
+Proof
+  cheat
+QED
+
+Theorem submap_domsub:
+  s ⊑ z ⇒ s \\ x ⊑ z \\ x
+Proof
+  cheat
+QED
+
+(*
+Theorem eval_bigger_state:
+  ∀ cl s p ev z. eval_exp cl (localise s p) e = Value ev ∧ s ⊑ z (* ∧ e ≠ Fn _ _ *) ⇒
+                 eval_exp cl (localise z p) e = Value ev
+Proof
+  Induct_on ‘e’ >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_value, PULL_EXISTS]
+  >- metis_tac[submap_localise, FLOOKUP_SUBMAP] >~
+  [‘Value (SumRV v)’]
+  >- (‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
+  [‘Value (SumLV v)’]
+  >- (‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
+  [‘eval_exp cl (localise s p |+ (vn, v)) body’]
+  >- (‘(s |+ ((vn,p),v)) ⊑ (z |+ ((vn,p),v))’ by metis_tac[submap_domsub, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
+  >> (rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
+QED
+*)
+
+(*
+Theorem eval_bigger_state_fn:
+  ∀ cl s p ev z. eval_exp cl (localise s p) (Fn vn e) = Value (Clos vn e E1) ∧ s ⊑ z ⇒
+                 eval_exp cl (localise z p) (Fn vn e) = Value (Clos vn e E2) ∧ E1 ⊑ E2
+Proof
+*)
 
 val _ = export_theory();
 

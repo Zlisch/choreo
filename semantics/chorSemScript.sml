@@ -9,7 +9,7 @@ Datatype:
         | LFix
         | LCom proc varN proc varN
         | LSel proc bool proc
-        | LLet varN proc exp result
+        | LLet varN proc exp (exp value result)
 End
 
 Definition freeprocs_def:
@@ -17,7 +17,7 @@ Definition freeprocs_def:
 ∧ freeprocs (LTau p n)         = {p}
 ∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
-∧ freeprocs (LLet v p e)       = {p}
+∧ freeprocs (LLet v p e r)     = {p}
 End
 
 Definition sender_def:
@@ -25,7 +25,7 @@ Definition sender_def:
 ∧ sender (LTau p n)          = NONE
 ∧ sender (LCom p1 v1 p2 v2)  = SOME p1
 ∧ sender (LSel p1 b p2)      = SOME p1
-∧ sender (LLet v p e)        = NONE
+∧ sender (LLet v p e r)      = NONE
 End
 
 Definition receiver_def:
@@ -33,7 +33,7 @@ Definition receiver_def:
 ∧ receiver (LTau p n)          = NONE
 ∧ receiver (LCom p1 v1 p2 v2)  = SOME p2
 ∧ receiver (LSel p1 b p2)      = SOME p2
-∧ receiver (LLet v p e)        = NONE
+∧ receiver (LLet v p e r)      = NONE
 End
 
 Definition written_def:
@@ -41,7 +41,7 @@ Definition written_def:
 ∧ written (LTau p n)          = NONE
 ∧ written (LCom p1 v1 p2 v2)  = SOME(v2,p2)
 ∧ written (LSel p1 b p2)      = NONE
-∧ written (LLet v p e)        = SOME(v,p)
+∧ written (LLet v p e r)      = SOME(v,p)
 End
 
 Definition read_def:
@@ -49,7 +49,7 @@ Definition read_def:
 ∧ read (LTau p n)         = {(n,p)}
 ∧ read (LCom p1 v1 p2 v2) = {(v1,p1)}
 ∧ read (LSel p1 b p2)     = {}
-∧ read (LLet v p e)       = {(s, p) | s ∈ free_vars e} (* IMAGE *)
+∧ read (LLet v p e r)     = {(s, p) | s ∈ free_vars e}
 End
 
 (* The set of all processes in a choreography *)
@@ -107,6 +107,7 @@ Definition receiversOf_def:
 ∧ receiversOf pn (Call _) = []
 End
 
+(* let exps of *)
 Definition letfunsOf_def:
   letfunsOf pn  Nil               = []
 ∧ letfunsOf pn (IfThen _ p l r)   = letfunsOf pn l ++ letfunsOf pn r
@@ -166,14 +167,14 @@ Inductive trans:
   (∀s v p e c cl.
     eval_exp cl (localise s p) e = Value ev
     ⇒ trans (s,Let v p e c)
-            (LLet v p e,[])
+            (LLet v p e (Value ev),[])
             (s |+ ((v,p), ev),c))
 
 [~letexn:]
   (∀s v p e c cl exn.
     eval_exp cl (localise s p) e = Exn exn
     ⇒ trans (s,Let v p e c)
-            (LLet v p e,[])
+            (LLet v p e (Exn exn),[])
             (s, Nil))
 
 [~if_true:]

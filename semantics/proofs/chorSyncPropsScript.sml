@@ -17,20 +17,20 @@ QED
 
 Definition lSyncTrm_def:
   lSyncTrm (s,Nil) l = (s,Nil)
-∧ lSyncTrm (s,Call x) l = (s,Call x)
-∧ lSyncTrm (s,Fix x c) l =  (if l = EMPTY_BAG then (s,Fix x c)
-                             else (s,dsubst c x (Fix x c)))
-∧ lSyncTrm (s,IfThen v p c1 c2) l = (if FLOOKUP s (v,p) = NONE
-                                     then (s,IfThen v p c1 c2)
-                                     else if (LTau p v) ⋲ l
-                                          then lSyncTrm (chor_tl s (IfThen v p c1 c2))
-                                                        (l − {|LTau p v|})
-                                          else if l = EMPTY_BAG then (s,IfThen v p c1 c2)
-                                               else lSyncTrm (chor_tl s (IfThen v p c1 c2)) l)
-∧ lSyncTrm (s,c) l   = (if (chor_tag c) ⋲ l
-                        then lSyncTrm (chor_tl s c) (l − {|chor_tag c|})
-                        else if  l = EMPTY_BAG then (s,c)
-                             else lSyncTrm (chor_tl s c) l)
+  ∧ lSyncTrm (s,Call x) l = (s,Call x)
+  ∧ lSyncTrm (s,Fix x c) l =  (if l = EMPTY_BAG then (s,Fix x c)
+                               else (s,dsubst c x (Fix x c)))
+  ∧ lSyncTrm (s,IfThen v p c1 c2) l = (if FLOOKUP s (v,p) = NONE
+                                       then (s,IfThen v p c1 c2)
+                                       else if (LTau p v) ⋲ l
+                                       then lSyncTrm (chor_tl s (IfThen v p c1 c2))
+                                                     (l − {|LTau p v|})
+                                       else if l = EMPTY_BAG then (s,IfThen v p c1 c2)
+                                       else lSyncTrm (chor_tl s (IfThen v p c1 c2)) l)
+  ∧ lSyncTrm (s,c) l   = (if (chor_tag c) ⋲ l
+                          then lSyncTrm (chor_tl s c) (l − {|chor_tag c|})
+                          else if  l = EMPTY_BAG then (s,c)
+                          else lSyncTrm (chor_tl s c) l)
 Termination
   WF_REL_TAC ‘measure (chor_size o SND o FST)’ \\ rw [chor_tag_def,chor_tl_def]
   \\ rfs [chor_size_def,syncTrm_def,chor_match_def,chor_tl_def]
@@ -114,7 +114,7 @@ QED
 
 (* Async trances can not contain LLet *)
 Theorem trans_l_not_let:
-  ∀p τ l q. trans p (τ,l) q ⇒ ∀v p f vl. ¬MEM (LLet v p f vl) l
+  ∀p τ l q. trans p (τ,l) q ⇒ ∀v p e rt. ¬MEM (LLet v p e rt) l
 Proof
   rpt (gen_tac)
   \\ Cases_on ‘p’
@@ -318,8 +318,8 @@ Proof
   (* Let-Normal *)
   >- (irule trans_sync_step
       \\ qmatch_goalsub_abbrev_tac ‘lSyncTrm (s'',_)’
-      \\ rename1 ‘Let v p f vl’
-      \\ MAP_EVERY qexists_tac [‘(s'',c)’,‘LLet v p f vl’]
+      \\ rename1 ‘Let v p e’
+      \\ MAP_EVERY qexists_tac [‘(s'',c)’,‘LLet v p e’]
       \\ reverse conj_tac
       >- metis_tac [trans_rules,trans_sync_refl]
       \\ Cases_on ‘c’ \\ fs [lSyncTrm_def,trans_sync_refl])

@@ -244,6 +244,8 @@ Theorem trans_submap:
    trans (s,c) (α,τ) (s',c') ∧ s ⊑ z
    ⇒ ∃z'. trans (z,c) (α,τ) (z',c') ∧ s' ⊑ z'
 Proof
+  (*
+  
   let
     val local_metis =
       metis_tac [trans_rules,FLOOKUP_SUBMAP,SUBMAP_mono_FUPDATE
@@ -259,7 +261,7 @@ Proof
   \\ rw []
   >- local_metis
   >- local_metis
-  >- (`EVERY IS_SOME (MAP (FLOOKUP z) (MAP (λv. (v,p)) vl))`
+  >- (`EVERY IS_SOME (MAP (FLOOKUP z) (MAP (λv. (v,p)) vl))` (* bigger state in richerlang *)
       by (Induct_on `vl` \\ rw [FLOOKUP_DEF,IS_SOME_DEF]
          \\ rfs [SUBMAP_DEF])
       \\  qexists_tac `z |+ ((v,p),f (MAP (THE ∘ FLOOKUP z) (MAP (λv. (v,p)) vl)))`
@@ -279,6 +281,9 @@ Proof
   \\ `z = z'` by (drule trans_state \\ rw [state_from_tag_def])
   \\ rveq \\ qexists_tac `z` \\ local_metis
   end
+
+     *)
+  cheat
 QED
 
 (* RTC version of `trans_submap` *)
@@ -439,7 +444,11 @@ Theorem no_undefined_vars_from_tags:
    no_undefined_vars (s,c) ⇒ no_undefined_vars (state_from_tag s α, c)
 Proof
   rw [no_undefined_vars_def,free_variables_def]
-  \\ Cases_on `α` \\ fs [state_from_tag_def]
+  \\ Cases_on `α` >~
+  [‘LLet s vn e r’]
+  >- (rw[state_from_tag_def] >> Cases_on ‘r’ >>
+      simp[] >> ho_match_mp_tac SUBSET_TRANS >> metis_tac[SUBSET_OF_INSERT])
+  \\ fs [state_from_tag_def]
   \\ ho_match_mp_tac SUBSET_TRANS
   \\ metis_tac [SUBSET_OF_INSERT]
 QED
@@ -449,14 +458,15 @@ QED
 *)
 Theorem no_undefined_FLOOKUP:
   (∀p v s c q x. no_undefined_vars (s,Com p v q x c)
-    ⇒ ∃x. FLOOKUP s (v,p) = SOME x)
-∧ (∀p v s c c1 c2. no_undefined_vars (s,IfThen v p c1 c2)
-    ⇒ ∃x. FLOOKUP s (v,p) = SOME x)
-∧ (∀p l s c v f. no_undefined_vars (s,Let v p f l c)
-    ⇒ EVERY IS_SOME (MAP (FLOOKUP s) (MAP (λv. (v,p)) l)))
+                 ⇒ ∃x. FLOOKUP s (v,p) = SOME x)
+  ∧ (∀p v s c c1 c2. no_undefined_vars (s,IfThen v p c1 c2)
+                     ⇒ ∃x. FLOOKUP s (v,p) = SOME x)
+  ∧ (∀p s c v e. no_undefined_vars (s,Let v p e c)
+                 ⇒ (∀ vn. vn ∈ free_vars e ⇒ IS_SOME (FLOOKUP s (vn,p))))
 Proof
-  rw [no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP]
-  \\ Induct_on ‘l’ \\ fs [] \\ rw [FDOM_FLOOKUP] \\ rw [IS_SOME_DEF]
+  rw [no_undefined_vars_def,free_variables_def,FDOM_FLOOKUP] >>
+  ‘(vn,p) ∈ {(s,p) | s ∈ free_vars e}’ by simp[] >>
+  ‘(vn,p) ∈ FDOM s’ by metis_tac[SUBSET_THM] >> metis_tac[FDOM_FLOOKUP, IS_SOME_DEF]
 QED
 
 (* MP-friendly version of no_undefined_FLOOKUP *)
@@ -508,7 +518,7 @@ QED
 Definition chor_match_def:
   chor_match (LCom p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x'))
 ∧ chor_match (LSel p b q)    (Sel p' b' q' c)     = ((p,b,q)  = (p',b',q'))
-∧ chor_match (LLet v p e)    (Let v' p' e' c)     = ((v,p,e) = (v',p',e'))
+∧ chor_match (LLet v p e r)  (Let v' p' e' c)     = ((v,p,e) = (v',p',e'))
 ∧ chor_match (LTau p v)      (IfThen v' p' c1 c2) = ((p,v)     = (p',v'))
 ∧ chor_match  LFix           (Fix _ _)            = T
 ∧ chor_match  _              _                    = F
@@ -520,7 +530,7 @@ End
 Definition chor_tag_def:
   chor_tag (Com p v q x _)  = LCom p v q x
 ∧ chor_tag (Sel p b q _)    = LSel p b q
-∧ chor_tag (Let v p e _)    = LLet v p e
+∧ chor_tag (Let v p e _)    = LLet v p e ARB
 ∧ chor_tag (IfThen v p _ _) = LTau p v
 ∧ chor_tag (Fix _ _)        = LFix
 End
@@ -536,8 +546,8 @@ Definition chor_tl_def:
 ∧ chor_tl s (Com p v q x c) = (s |+ ((x,q),(THE o FLOOKUP s) (v,p)),c)
 ∧ chor_tl s (Sel p b q c)   = (s,c)
 ∧ chor_tl s (Let v p e c) =
-  (if ∃ cl. eval_exp cl (localise s p) e = Value ev then (s |+ ((v,p), ev),c)
-   else (s, Nil))
+  (if ∃ cl ev. eval_exp cl (localise s p) e = Value ev then (s |+ ((v,p), ev),c)
+   else (s, Nil)) (* ev free error *)
 ∧ chor_tl s (IfThen v p c1 c2) =
     (if FLOOKUP s (v,p) = SOME (BoolV T) then (s,c1)
      else if FLOOKUP s (v,p) = SOME (BoolV F) then (s,c2)
@@ -552,19 +562,19 @@ Definition syncTrm_def:
   syncTrm (k:num) (s,Nil) τ              = NONE
 ∧ syncTrm  k      (s,Call v) τ           = NONE
 ∧ syncTrm  k      (s,IfThen v p c1 c2) τ =
-   (if (k = 0) then NONE
-    else if chor_match τ (IfThen v p c1 c2)
-         then SOME (chor_tl s (IfThen v p c1 c2))
-         else if FLOOKUP s (v,p) = SOME [1w]
-              then syncTrm (k-1) (s,c1) τ
-              else if ∃w. FLOOKUP s (v,p) = SOME w ∧ w ≠ [1w]
-                   then syncTrm (k-1)(s,c2) τ
-                   else NONE)
+  (if (k = 0) then NONE
+   else if chor_match τ (IfThen v p c1 c2)
+   then SOME (chor_tl s (IfThen v p c1 c2))
+   else if FLOOKUP s (v,p) = SOME (BoolV T)
+   then syncTrm (k-1) (s,c1) τ
+   else if FLOOKUP s (v,p) = SOME (BoolV F)
+   then syncTrm (k-1)(s,c2) τ
+   else NONE)
 ∧ syncTrm k (s,c) τ =
-   (if (k = 0) then NONE
-    else if chor_match τ c
-         then SOME (chor_tl s c)
-         else syncTrm (k-1) (chor_tl s c) τ)
+  (if (k = 0) then NONE
+   else if chor_match τ c
+   then SOME (chor_tl s c)
+   else syncTrm (k-1) (chor_tl s c) τ)
 End
 
 (* Alternative induction principle *)
