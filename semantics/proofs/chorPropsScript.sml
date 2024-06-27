@@ -283,7 +283,7 @@ Proof
   end
 
      *)
-  cheat
+     cheat
 QED
 
 (* RTC version of `trans_submap` *)
@@ -546,8 +546,9 @@ Definition chor_tl_def:
 ∧ chor_tl s (Com p v q x c) = (s |+ ((x,q),(THE o FLOOKUP s) (v,p)),c)
 ∧ chor_tl s (Sel p b q c)   = (s,c)
 ∧ chor_tl s (Let v p e c) =
-  (if ∃ cl ev. eval_exp cl (localise s p) e = Value ev then (s |+ ((v,p), ev),c)
-   else (s, Nil)) (* ev free error *)
+  (case some ev. ∃ cl. eval_exp cl (localise s p) e = Value ev of
+     NONE => (s, Nil)
+   | SOME ev => (s |+ ((v,p), ev),c))
 ∧ chor_tl s (IfThen v p c1 c2) =
     (if FLOOKUP s (v,p) = SOME (BoolV T) then (s,c1)
      else if FLOOKUP s (v,p) = SOME (BoolV F) then (s,c2)
@@ -804,7 +805,7 @@ QED
 
 Theorem dprocsOf_ALOOKUP_EQ_set_opt:
   ∀dvars dvars' c.
-    (∀dn. MEM dn (dvarsOf c) ⇒ OPTION_REL (λx y. set x = set y) (ALOOKUP dvars dn) (ALOOKUP dvars' dn)) ⇒
+    (∀dn. MEM dn (dvarsOf c) ⇒ OPTREL (λx y. set x = set y) (ALOOKUP dvars dn) (ALOOKUP dvars' dn)) ⇒
     set(dprocsOf dvars c) = set(dprocsOf dvars' c)
 Proof
   Induct_on ‘c’ >>

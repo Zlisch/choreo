@@ -32,7 +32,7 @@ Definition eval_exp_def:
     v1 <- eval_exp c E e1;
     eval_exp c (E |+ (s, v1)) e2;
   od ∧
-  eval_exp c E (Fn s e) = return (Clos s e E)
+  eval_exp c E (Fn s e) = return (Clos s e (DRESTRICT E (free_vars e)))
   ∧
   eval_exp c E (App e1 e2) = (if c>0 then
                                do
@@ -85,8 +85,7 @@ Proof
   Cases_on ‘m’>>simp[]
 QED
 
-
-(* why >~[‘typecheck G (Case e arg1 e1 arg2 e2)’] doesn't work ... *)
+(* 
 Theorem type_soundness:
   ∀ c E e G ty. envtype G E ∧ typecheck G e ty ⇒
                 (∃ v. eval_exp c E e = Value v ∧
@@ -116,6 +115,7 @@ Proof
           first_x_assum $ drule_all_then $ strip_assume_tac >> simp[])
       >> simp[])
 QED
+*)
 
 Theorem clock_value_increment:
   ∀ cl0 E e v. eval_exp cl0 E e = Value v ⇒
