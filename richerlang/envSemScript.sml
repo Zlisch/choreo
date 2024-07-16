@@ -1,4 +1,4 @@
-open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory;
+open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory pred_setTheory;
 
 val _ = new_theory "envSem";
 
@@ -85,7 +85,38 @@ Proof
   Cases_on ‘m’>>simp[]
 QED
 
-(* 
+Theorem envtype_submap:
+  envtype G E ∧ G' ⊑ G ⇒ envtype G' E
+Proof
+  metis_tac[envtype_def, SUBMAP_FLOOKUP_EQN]
+QED
+
+Theorem FLOOKUP_supermap:
+  FLOOKUP E1 s = SOME v ∧ s ∈ FDOM E2 ∧ E2 ⊑ E1 ⇒
+          FLOOKUP E2 s = SOME v
+Proof
+  rw[FLOOKUP_DEF, SUBMAP_DEF]
+QED
+
+Theorem envtype_DRESTRICT:
+  envtype G E ⇒ envtype (DRESTRICT G (FDOM (DRESTRICT E (free_vars e)))) (DRESTRICT E (free_vars e))
+Proof
+  rw[envtype_def] >>
+  ‘FLOOKUP G str = SOME ty’ by metis_tac[SUBMAP_DRESTRICT, SUBMAP_FLOOKUP_EQN] >>
+  first_x_assum $ drule_all_then $ strip_assume_tac >>
+  ‘str ∈ FDOM (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))))’ by simp[TO_FLOOKUP] >>
+  ‘str ∈ (FDOM (DRESTRICT E (free_vars e)))’ by metis_tac[DRESTRICT_DEF, IN_INTER] >>
+  ‘(DRESTRICT E (free_vars e)) ⊑ E’ by simp[SUBMAP_DRESTRICT] >>
+  metis_tac[FLOOKUP_supermap]
+QED
+
+Theorem typecheck_update_sub_fv:
+  envtype G E ∧ typecheck (G |+ (s,ty1)) e ty ⇒
+          typecheck (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) |+ (s,ty1)) e ty
+Proof
+  Induct_on ‘e’ >> rw[free_vars_ind]
+QED
+
 Theorem type_soundness:
   ∀ c E e G ty. envtype G E ∧ typecheck G e ty ⇒
                 (∃ v. eval_exp c E e = Value v ∧
@@ -99,7 +130,8 @@ Proof
   [‘G |+ (s, ty1)’]
   >- ( (* let *) simp[PULL_EXISTS] >> first_x_assum drule_all >> strip_tac >> simp[] >> metis_tac [envtype_lemma]) >~
   [‘G |+ (s, ty1)’]
-  >- ( (* fn *) irule value_type_FnV >> metis_tac [envtype_def]) >~
+  >- ( (* fn *) irule value_type_FnV >>
+       metis_tac[envtype_DRESTRICT, envtype_def, typecheck_update_sub_fv]) >~
   [‘uoptype uop ity oty’, ‘typecheck G arg ity’]
   >- ( (* uop *) first_x_assum $ drule_all_then $ strip_assume_tac >> simp[] >> metis_tac[uop_type_soundness]) >~
   [‘boptype bop ity1 ity2 oty’, ‘typecheck G arg1 ity1’, ‘typecheck G arg2 ity2’]
@@ -115,7 +147,6 @@ Proof
           first_x_assum $ drule_all_then $ strip_assume_tac >> simp[])
       >> simp[])
 QED
-*)
 
 Theorem clock_value_increment:
   ∀ cl0 E e v. eval_exp cl0 E e = Value v ⇒
@@ -164,35 +195,33 @@ Proof
   cheat
 QED
 
-Theorem submap_domsub:
+Theorem submap_domsub2:
   s ⊑ z ⇒ s \\ x ⊑ z \\ x
 Proof
   cheat
 QED
 
-(*
+Theorem submap_localise:
+  s ⊑ z ⇒ localise s p ⊑ localise z p
+Proof
+  cheat
+QED
+                
 Theorem eval_bigger_state:
-  ∀ cl s p ev z. eval_exp cl (localise s p) e = Value ev ∧ s ⊑ z (* ∧ e ≠ Fn _ _ *) ⇒
+  ∀ cl s p ev z. eval_exp cl (localise s p) e = Value ev ∧ s ⊑ z ⇒
                  eval_exp cl (localise z p) e = Value ev
 Proof
   Induct_on ‘e’ >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_value, PULL_EXISTS]
-  >- metis_tac[submap_localise, FLOOKUP_SUBMAP] >~
+  >- metis_tac[submap_localise, FLOOKUP_SUBMAP] >~ 
   [‘Value (SumRV v)’]
-  >- (‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
+  >- (‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
   [‘Value (SumLV v)’]
-  >- (‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
+  >- (‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
   [‘eval_exp cl (localise s p |+ (vn, v)) body’]
-  >- (‘(s |+ ((vn,p),v)) ⊑ (z |+ ((vn,p),v))’ by metis_tac[submap_domsub, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
+  >- (‘(s |+ ((vn,p),v)) ⊑ (z |+ ((vn,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
   >> (rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
+  >> ‘localise s' p ⊑ localise z p’ by simp[submap_localise]
 QED
-*)
-
-(*
-Theorem eval_bigger_state_fn:
-  ∀ cl s p ev z. eval_exp cl (localise s p) (Fn vn e) = Value (Clos vn e E1) ∧ s ⊑ z ⇒
-                 eval_exp cl (localise z p) (Fn vn e) = Value (Clos vn e E2) ∧ E1 ⊑ E2
-Proof
-*)
 
 val _ = export_theory();
 

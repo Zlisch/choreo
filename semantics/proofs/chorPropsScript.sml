@@ -1,4 +1,4 @@
-open preamble choreoUtilsTheory chorSemTheory chorLangTheory richerLangTheory;
+open preamble choreoUtilsTheory chorSemTheory chorLangTheory richerLangTheory valueTheory;
 
 val _ = new_theory "chorProps";
 
@@ -589,6 +589,13 @@ Definition not_finish_def[simp]:
   not_finish c = (c ≠ Nil ∧ ∀x. c ≠ Call x)
 End
 
+(* not true *)
+Theorem not_BoolV:
+  x ≠ BoolV T ∧ x ≠ BoolV F ⇒ ¬is_BoolV x
+Proof
+  cheat
+QED
+
 (* A choreography can always advance synchronously consuming
    the operation at the front
 *)
@@ -607,11 +614,12 @@ Proof
   >- (IF_CASES_TAC
       >- fs [trans_if_true]
       \\ drule no_undefined_FLOOKUP_if \\ rw [] \\ fs []
-      \\ fs [trans_if_false])
+      >- fs [trans_if_false]
+      >> irule trans_if_exn >> metis_tac[is_BoolV_def, not_BoolV])
   >- (drule no_undefined_FLOOKUP_com \\ rw []
      \\  fs [trans_com])
   >- (drule no_undefined_FLOOKUP_let \\ rw []
-     \\  fs [trans_let])
+     \\  fs [trans_letval, trans_letexn])
   \\ fs [trans_sel,trans_fix]
 QED
 
