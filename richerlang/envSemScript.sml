@@ -110,11 +110,23 @@ Proof
   metis_tac[FLOOKUP_supermap]
 QED
 
+Theorem typecheck_drestrict:
+  typecheck G e ty ∧ free_vars e ⊆ A ⇒
+  typecheck (DRESTRICT G A) e ty
+Proof
+  cheat
+QED
+
 Theorem typecheck_update_sub_fv:
   envtype G E ∧ typecheck (G |+ (s,ty1)) e ty ⇒
           typecheck (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) |+ (s,ty1)) e ty
 Proof
-  Induct_on ‘e’ >> rw[free_vars_ind]
+  (*
+  Induct_on ‘typecheck’ >> rw[]
+  >- (gvs[FLOOKUP_SIMP, AllCaseEqs(), FDOM_DRESTRICT, envtype_def] >>
+      metis_tac[flookup_thm])
+  *)
+  cheat
 QED
 
 Theorem type_soundness:
@@ -206,12 +218,26 @@ Theorem submap_localise:
 Proof
   cheat
 QED
+
+(* For Fn case in eval_bigger_state *)
+Theorem eval_no_undefined_vars:
+  envtype G E ∧ typecheck G e ty ⇒
+  free_vars e ⊆ FDOM E
+Proof
+  cheat
+QED
                 
 Theorem eval_bigger_state:
   ∀ cl s p ev z. eval_exp cl (localise s p) e = Value ev ∧ s ⊑ z ⇒
                  eval_exp cl (localise z p) e = Value ev
 Proof
-  Induct_on ‘e’ >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_value, PULL_EXISTS]
+  (*
+  Induct_on ‘e’ >~
+  [‘Fn _ _’]
+  >- (rpt strip_tac >> drule_all_then strip_assume_tac eval_no_undefined_vars >>
+      gvs[eval_exp_def]
+     )
+  >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_value, PULL_EXISTS]
   >- metis_tac[submap_localise, FLOOKUP_SUBMAP] >~ 
   [‘Value (SumRV v)’]
   >- (‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
@@ -221,6 +247,8 @@ Proof
   >- (‘(s |+ ((vn,p),v)) ⊑ (z |+ ((vn,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
   >> (rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
   >> ‘localise s' p ⊑ localise z p’ by simp[submap_localise]
+  *)
+  cheat
 QED
 
 val _ = export_theory();

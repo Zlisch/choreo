@@ -571,6 +571,13 @@ Definition syncTrm_def:
    else if FLOOKUP s (v,p) = SOME (BoolV F)
    then syncTrm (k-1)(s,c2) τ
    else NONE)
+∧ syncTrm k (s, Com p1 v1 p2 v2 c) τ =
+  (if k = 0 then NONE
+   else if chor_match τ (Com p1 v1 p2 v2 c)
+   then SOME (chor_tl s (Com p1 v1 p2 v2 c))
+   else case some str. FLOOKUP s (v1,p1) = SOME (StrV str) of
+          NONE => NONE
+        | SOME str => syncTrm (k-1) (s|+((v2,p2), (StrV str)), c) τ)
 ∧ syncTrm k (s,c) τ =
   (if (k = 0) then NONE
    else if chor_match τ c
@@ -589,11 +596,10 @@ Definition not_finish_def[simp]:
   not_finish c = (c ≠ Nil ∧ ∀x. c ≠ Call x)
 End
 
-(* not true *)
 Theorem not_BoolV:
   x ≠ BoolV T ∧ x ≠ BoolV F ⇒ ¬is_BoolV x
 Proof
-  cheat
+  Cases_on ‘x’ >> simp[]
 QED
 
 (* A choreography can always advance synchronously consuming
