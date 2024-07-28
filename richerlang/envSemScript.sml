@@ -1,4 +1,4 @@
-open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory pred_setTheory;
+open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory pred_setTheory optionTheory;
 
 val _ = new_theory "envSem";
 
@@ -32,7 +32,7 @@ Definition eval_exp_def:
     v1 <- eval_exp c E e1;
     eval_exp c (E |+ (s, v1)) e2;
   od ∧
-  eval_exp c E (Fn s e) = return (Clos s e (DRESTRICT E (free_vars e)))
+  eval_exp c E (Fn s e) = return (Clos s e (DRESTRICT E (free_vars e) \\ s))
   ∧
   eval_exp c E (App e1 e2) = (if c>0 then
                                do
@@ -99,14 +99,19 @@ Proof
 QED
 
 Theorem envtype_DRESTRICT:
+  (*
   envtype G E ⇒ envtype (DRESTRICT G (FDOM (DRESTRICT E (free_vars e)))) (DRESTRICT E (free_vars e))
+  *)
+  envtype G E ⇒ envtype (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) \\ s) (DRESTRICT E (free_vars e) \\ s)
 Proof
   rw[envtype_def] >>
-  ‘FLOOKUP G str = SOME ty’ by metis_tac[SUBMAP_DRESTRICT, SUBMAP_FLOOKUP_EQN] >>
+  ‘FLOOKUP G str = SOME ty’ by metis_tac[SUBMAP_DOMSUB, SUBMAP_DRESTRICT, SUBMAP_FLOOKUP_EQN] >>
   first_x_assum $ drule_all_then $ strip_assume_tac >>
-  ‘str ∈ FDOM (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))))’ by simp[TO_FLOOKUP] >>
-  ‘str ∈ (FDOM (DRESTRICT E (free_vars e)))’ by metis_tac[DRESTRICT_DEF, IN_INTER] >>
-  ‘(DRESTRICT E (free_vars e)) ⊑ E’ by simp[SUBMAP_DRESTRICT] >>
+  ‘str ∈ FDOM (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) \\ s)’ by simp[TO_FLOOKUP] >>
+  ‘str ∈ (FDOM (DRESTRICT E (free_vars e)))’ by metis_tac[FDOM_DOMSUB, IN_DELETE, DRESTRICT_DEF, IN_INTER] >>
+  ‘str ≠ s’ by metis_tac[FDOM_DOMSUB, IN_DELETE] >>
+  ‘str ∈ (FDOM (DRESTRICT E (free_vars e) \\ s))’ by simp[FDOM_DOMSUB, IN_DELETE] >>
+  ‘(DRESTRICT E (free_vars e) \\ s) ⊑ E’ by metis_tac[SUBMAP_DOMSUB, SUBMAP_TRANS, SUBMAP_DRESTRICT] >>
   metis_tac[FLOOKUP_supermap]
 QED
 
@@ -114,12 +119,19 @@ Theorem typecheck_drestrict:
   typecheck G e ty ∧ free_vars e ⊆ A ⇒
   typecheck (DRESTRICT G A) e ty
 Proof
+  (*
+  Induct_on ‘typecheck’ >> rw[]
+  >- simp[FLOOKUP_SIMP]
+  >- (‘{s} ⊆ A’ by simp[SUBSET_DEF] >> metis_tac[UNION_SUBSET, UNION_DIFF_EQ])
+  >- ()
+  >> metis_tac[]
+  *)
   cheat
 QED
 
 Theorem typecheck_update_sub_fv:
   envtype G E ∧ typecheck (G |+ (s,ty1)) e ty ⇒
-          typecheck (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) |+ (s,ty1)) e ty
+          typecheck (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) \\ s |+ (s,ty1)) e ty
 Proof
   (*
   Induct_on ‘typecheck’ >> rw[]
@@ -142,7 +154,7 @@ Proof
   [‘G |+ (s, ty1)’]
   >- ( (* let *) simp[PULL_EXISTS] >> first_x_assum drule_all >> strip_tac >> simp[] >> metis_tac [envtype_lemma]) >~
   [‘G |+ (s, ty1)’]
-  >- ( (* fn *) irule value_type_FnV >>
+  >- ( (* fn *) irule value_type_FnV >> 
        metis_tac[envtype_DRESTRICT, envtype_def, typecheck_update_sub_fv]) >~
   [‘uoptype uop ity oty’, ‘typecheck G arg ity’]
   >- ( (* uop *) first_x_assum $ drule_all_then $ strip_assume_tac >> simp[] >> metis_tac[uop_type_soundness]) >~
@@ -219,24 +231,66 @@ Proof
   cheat
 QED
 
+Theorem envtype_fdom:
+  envtype G E ⇒ FDOM G ⊆ FDOM E
+Proof
+  rw[envtype_def, SUBSET_DEF, TO_FLOOKUP] >> metis_tac[option_CLAUSES]
+QED
+
 (* For Fn case in eval_bigger_state *)
 Theorem eval_no_undefined_vars:
   envtype G E ∧ typecheck G e ty ⇒
   free_vars e ⊆ FDOM E
 Proof
-  cheat
+  metis_tac[typecheck_vars, envtype_fdom, SUBSET_TRANS]
 QED
+
+Theorem delete_inter_eq:
+  A ∩ (B DELETE s) = (A DELETE s) ∩ B
+Proof
+  irule $ iffRL $ SET_EQ_SUBSET >> rw[SUBSET_DEF]
+QED
+
+Theorem drestrict_domsub_map:
+  DRESTRICT f s \\ k = DRESTRICT (f \\ k) s
+Proof
+  rw[DRESTRICT_DOMSUB] >> irule $ iffRL $ DRESTRICT_EQ_DRESTRICT >>
+  rw[DELETE_INTER, SET_EQ_SUBSET, SUBSET_DEF, SUBMAP_DEF, DRESTRICT_DEF, DOMSUB_FAPPLY_NEQ]
+QED
+
+Theorem subset_absortion:
+  A ⊆ B ∧ B ⊆ C ⇒
+  A ∩ B = A ∩ C
+Proof
+  metis_tac[SUBSET_DEF, SUBSET_TRANS, SUBSET_INTER_ABSORPTION]
+QED
+
+(*
+Theorem temp:
+  s' ⊑ z ∧ free_vars e DIFF {s} ⊆ FDOM (localise s' p) ⇒
+     DRESTRICT (localise s' p) (free_vars e) \\ s = DRESTRICT (localise z p) (free_vars e) \\ s
+Proof
+  rw[] (* exclude this *) >>
+  rw[drestrict_domsub_map] >> irule $ iffRL $ DRESTRICT_EQ_DRESTRICT_SAME >>
+  ‘localise s' p ⊑ localise z p’ by simp[submap_localise] >> rw [] >>
+  metis_tac[DOMSUB_FAPPLY_NEQ, SUBMAP_DEF, delete_inter_eq, DELETE_DEF, SUBMAP_FDOM_SUBSET, subset_absortion]
+QED
+*)
                 
 Theorem eval_bigger_state:
-  ∀ cl s p ev z. eval_exp cl (localise s p) e = Value ev ∧ s ⊑ z ⇒
-                 eval_exp cl (localise z p) e = Value ev
+  ∀ cl s p ev z G E ty. eval_exp cl (localise s p) e = Value ev ∧ s ⊑ z
+                        ∧
+                        envtype G (localise s p) ∧ typecheck G e ty ⇒
+                        eval_exp cl (localise z p) e = Value ev
 Proof
-  (*
   Induct_on ‘e’ >~
   [‘Fn _ _’]
-  >- (rpt strip_tac >> drule_all_then strip_assume_tac eval_no_undefined_vars >>
-      gvs[eval_exp_def]
-     )
+  >- (rpt strip_tac >>
+      ‘(free_vars e DIFF {s}) ⊆ FDOM (localise s' p)’ by metis_tac[eval_no_undefined_vars, free_vars] >> rw[eval_exp_def] >>
+      ‘DRESTRICT (localise s' p) (free_vars e) \\ s = DRESTRICT (localise z p) (free_vars e) \\ s’ by (rw[drestrict_domsub_map] >> irule $ iffRL $ DRESTRICT_EQ_DRESTRICT_SAME >>
+  ‘localise s' p ⊑ localise z p’ by simp[submap_localise] >> rw [] >>
+  metis_tac[DOMSUB_FAPPLY_NEQ, SUBMAP_DEF, delete_inter_eq, DELETE_DEF, SUBMAP_FDOM_SUBSET, subset_absortion]) >>
+      gvs[eval_exp_def])
   >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_value, PULL_EXISTS]
   >- metis_tac[submap_localise, FLOOKUP_SUBMAP] >~ 
   [‘Value (SumRV v)’]
@@ -246,9 +300,6 @@ Proof
   [‘eval_exp cl (localise s p |+ (vn, v)) body’]
   >- (‘(s |+ ((vn,p),v)) ⊑ (z |+ ((vn,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
   >> (rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
-  >> ‘localise s' p ⊑ localise z p’ by simp[submap_localise]
-  *)
-  cheat
 QED
 
 val _ = export_theory();
