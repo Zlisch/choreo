@@ -237,6 +237,13 @@ Proof
   rw[envtype_def, SUBSET_DEF, TO_FLOOKUP] >> metis_tac[option_CLAUSES]
 QED
 
+Theorem envtype_update:
+  envtype G E ∧ value_type v t ⇒
+  envtype (G|+(s,t)) (E|+(s,v))
+Proof
+  rw[envtype_def] >> rw[FLOOKUP_UPDATE] >> gvs[FLOOKUP_UPDATE]
+QED
+
 (* For Fn case in eval_bigger_state *)
 Theorem eval_no_undefined_vars:
   envtype G E ∧ typecheck G e ty ⇒
@@ -265,21 +272,27 @@ Proof
   metis_tac[SUBSET_DEF, SUBSET_TRANS, SUBSET_INTER_ABSORPTION]
 QED
 
-(*
-Theorem temp:
-  s' ⊑ z ∧ free_vars e DIFF {s} ⊆ FDOM (localise s' p) ⇒
-     DRESTRICT (localise s' p) (free_vars e) \\ s = DRESTRICT (localise z p) (free_vars e) \\ s
+(* ? type soundness *)
+Theorem eval_sumv_types:
+  envtype G E ∧ typecheck G e (sumT t1 t2) ⇒
+  (eval_exp cl E e = Value (SumRV v) ⇒ value_type v t2) ∧
+  (eval_exp cl E e = Value (SumLV v) ⇒ value_type v t1)
 Proof
-  rw[] (* exclude this *) >>
-  rw[drestrict_domsub_map] >> irule $ iffRL $ DRESTRICT_EQ_DRESTRICT_SAME >>
-  ‘localise s' p ⊑ localise z p’ by simp[submap_localise] >> rw [] >>
-  metis_tac[DOMSUB_FAPPLY_NEQ, SUBMAP_DEF, delete_inter_eq, DELETE_DEF, SUBMAP_FDOM_SUBSET, subset_absortion]
+  cheat
 QED
-*)
-                
+
+Theorem eval_value_type:
+  envtype G E ∧ typecheck G e ty ∧ eval_exp cl E e = Value v ⇒
+  value_type v ty
+Proof
+  rw[] >> drule type_soundness >>
+  disch_then (qspec_then ‘cl’ strip_assume_tac) >>
+  first_x_assum $ drule_then $ strip_assume_tac >> gvs[]
+QED
+
+(* based on type soundness *)
 Theorem eval_bigger_state:
-  ∀ cl s p ev z G E ty. eval_exp cl (localise s p) e = Value ev ∧ s ⊑ z
-                        ∧
+  ∀ cl s p ev z G E ty. eval_exp cl (localise s p) e = Value ev ∧ s ⊑ z ∧
                         envtype G (localise s p) ∧ typecheck G e ty ⇒
                         eval_exp cl (localise z p) e = Value ev
 Proof
@@ -294,11 +307,19 @@ Proof
   >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_value, PULL_EXISTS]
   >- metis_tac[submap_localise, FLOOKUP_SUBMAP] >~ 
   [‘Value (SumRV v)’]
-  >- (‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
+  >- (‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >>
+      gvs[localise_update_eqn] >>
+      ‘envtype (G |+ (s,t2)) (localise (s' |+ ((s,p),v)) p)’ by metis_tac[eval_sumv_types, localise_update_eqn, envtype_update] >>
+      rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
   [‘Value (SumLV v)’]
-  >- (‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
+  >- (‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >>
+      gvs[localise_update_eqn] >>
+      ‘envtype (G |+ (s0,t1)) (localise (s' |+ ((s0,p),v)) p)’ by metis_tac[eval_sumv_types, localise_update_eqn, envtype_update] >>
+      rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
   [‘eval_exp cl (localise s p |+ (vn, v)) body’]
-  >- (‘(s |+ ((vn,p),v)) ⊑ (z |+ ((vn,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
+  >- (‘(s |+ ((vn,p),v)) ⊑ (z |+ ((vn,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
+      ‘envtype (G|+(vn,ety)) (localise (s |+ ((vn,p),v)) p)’ by metis_tac[eval_value_type, localise_update_eqn, envtype_update] >>
+      rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
   >> (rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
 QED
 
