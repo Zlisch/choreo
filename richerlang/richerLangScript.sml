@@ -249,6 +249,7 @@ Definition free_vars[simp]:
   free_vars (Let s e1 e2) = free_vars e1 ∪ (free_vars e2 DIFF {s}) ∧
   free_vars (Fn s e) = free_vars e DIFF {s} ∧
   free_vars (App e1 e2) = free_vars e1 ∪ free_vars e2 ∧
+  free_vars (Case e s1 e1 s2 e2) = free_vars e ∪ (free_vars e1 DIFF {s1}) ∪ (free_vars e2 DIFF {s2}) ∧
   free_vars _ = {}
 End
 

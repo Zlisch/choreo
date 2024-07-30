@@ -169,7 +169,7 @@ Inductive trans:
 
 [~letval:]
   (∀s v p e c cl.
-    eval_exp cl (localise s p) e = Value ev
+    eval_exp cl (localise s p) e = Value ev ∧ free_vars e ⊆ FDOM (localise s p) (* not sure *)
     ⇒ trans (s,Let v p e c)
             (LLet v p e (Value ev),[])
             (s |+ ((v,p), ev),c))
