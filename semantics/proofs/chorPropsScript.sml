@@ -230,6 +230,7 @@ Definition state_from_tag_def:
 End
 
 (* The resulting state of any transition can be described using `state_from_tag` *)
+(* need to address com_exn so prob error label? *)
 Theorem trans_state:
   ∀s c α τ s' c'. trans (s,c) (α,τ) (s',c') ⇒ s' = state_from_tag s α
 Proof
@@ -238,7 +239,7 @@ Proof
   \\ rw [state_from_tag_def]
   \\ fs [FLOOKUP_DEF]
     *)
-    cheat
+  cheat
 QED
 
 (* Making the state bigger does not affect the behaviour of the choreography *)
@@ -248,37 +249,38 @@ Theorem trans_submap:
    ⇒ ∃z'. trans (z,c) (α,τ) (z',c') ∧ s' ⊑ z'
 Proof
   let
-    val local_metis =
-      metis_tac [trans_rules,FLOOKUP_SUBMAP,SUBMAP_mono_FUPDATE
-                , SUBMAP_DOMSUB,GSYM SUBMAP_DOMSUB_gen
-                , SUBMAP_TRANS]
+val local_metis =
+metis_tac [trans_rules,FLOOKUP_SUBMAP,SUBMAP_mono_FUPDATE
+           , SUBMAP_DOMSUB,GSYM SUBMAP_DOMSUB_gen
+           , SUBMAP_TRANS]
   in
-  `∀s c α τ s' c'.
-   trans (s,c) (α,τ) (s',c')
-   ⇒ ∀z. s ⊑ z
-      ⇒ ∃z'. trans (z,c) (α,τ) (z',c') ∧ s' ⊑ z'`
-  suffices_by metis_tac []
-  \\ ho_match_mp_tac trans_pairind
-  \\ rw []
-  >- local_metis
-  >- local_metis
-  >- local_metis
-
->- metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE, trans_letval, eval_bigger_state_fv, submap_localise, SUBMAP_FDOM_SUBSET, SUBSET_TRANS]
->- metis_tac[eval_bigger_state_exn, trans_letexn]
-   
-  >- local_metis
->- local_metis
->- local_metis
-  >- (res_tac
+    `∀s c α τ s' c'.
+  trans (s,c) (α,τ) (s',c')
+  ⇒ ∀z. s ⊑ z
+        ⇒ ∃z'. trans (z,c) (α,τ) (z',c') ∧ s' ⊑ z'`
+               suffices_by metis_tac []
+\\ ho_match_mp_tac trans_pairind
+\\ rw []  >~
+[‘Let v p e c’, ‘Value ev’]
+>- metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE, trans_letval, eval_bigger_state_fv, submap_localise, SUBMAP_FDOM_SUBSET, SUBSET_TRANS] >~
+[‘Let v p e c’, ‘Exn exn’]
+>- metis_tac[eval_bigger_state_exn, trans_letexn] >~
+[‘IfThen _ _ _ _’, ‘l τ≅ l'’]
+>- ( (* if_swap *) res_tac
      \\ `z' = z''` by metis_tac [trans_state]
-     \\ rveq \\ qexists_tac `z'` \\ local_metis)
-  >- local_metis >- local_metis >- local_metis
-  >- local_metis >- local_metis >- local_metis
-  \\ res_tac
+     \\ rveq \\ qexists_tac `z'` \\ local_metis) >~
+[‘Com _ _ _ _ _’, ‘written alpha ≠ SOME (v1,p1)’, ‘trans (s,c) (alpha,l) (s',c')’]
+>- ( (* com_async *) metis_tac[trans_com_async]) >~
+[‘LFix’, ‘IfThen _ _ _ _’]
+>- (res_tac
   \\ `z = z'` by (drule trans_state \\ rw [state_from_tag_def])
-  \\ rveq \\ qexists_tac `z` \\ local_metis
-  end
+    \\ rveq \\ qexists_tac `z` \\ local_metis)  >~
+[‘LFix’, ‘IfThen _ _ _ _’]
+>- (res_tac
+  \\ `z = z'` by (drule trans_state \\ rw [state_from_tag_def])
+    \\ rveq \\ qexists_tac `z` \\ local_metis)
+>> local_metis
+   end
 QED
 
 (* RTC version of `trans_submap` *)
@@ -328,6 +330,7 @@ Definition defined_vars_def:
 End
 
 Definition no_undefined_vars_def:
+  (* no_undefined_vars (s, Com p1 v1 p2 v2 c) = (free_variables c ⊆ FDOM s ∧ ∃ x. FLOOKUP s (v1,p1) = SOME (StrV x)) ∧ *)
   no_undefined_vars (s,c) = (free_variables c ⊆ FDOM s)
 End
 
@@ -401,7 +404,8 @@ QED
 
 (* Transitions preserve ‘no_undefined_vars’ since they can not remove
    variables from the state
-*)
+ *)
+(* won't work if change no undefined vars *)
 Theorem no_undefined_vars_trans_pres:
   ∀sc alpha sc'. no_undefined_vars sc ∧ trans sc alpha sc' ⇒ no_undefined_vars sc'
 Proof
@@ -415,7 +419,8 @@ Proof
   >> imp_res_tac free_vars_mono
   >> fs[no_undefined_vars_def,free_variables_def,DELETE_SUBSET_INSERT,defined_vars_def,SUBSET_OF_INSERT,
         free_variables_dsubst_eq_Fix]
-  >> fs[SUBSET_DEF,INSERT_DEF,DIFF_DEF] >> metis_tac[]
+  >> fs[SUBSET_DEF,INSERT_DEF,DIFF_DEF]
+  >> metis_tac[]
 QED
 
 (* Transitions preserve ‘no_undefined_vars’ since they can not remove
@@ -599,7 +604,8 @@ QED
 
 (* A choreography can always advance synchronously consuming
    the operation at the front
-*)
+ *)
+(* com_val issue, need SOME StrV x instead of SOME x *)
 Theorem chor_tag_trans:
   ∀s c k p.
    no_undefined_vars (s,c)
@@ -608,6 +614,7 @@ Theorem chor_tag_trans:
    ∧ syncTrm k (s,c) (chor_tag c) = SOME p
    ⇒ trans (s,c) (chor_tag c,[]) p
 Proof
+  (*
   rw [] \\ Cases_on ‘c’
   \\ fs [ chor_tag_def,syncTrm_def,chor_match_def
         , chor_tl_def,no_self_comunication_def]
@@ -622,6 +629,8 @@ Proof
   >- (drule no_undefined_FLOOKUP_let \\ rw []
      \\  fs [trans_letval, trans_letexn])
   \\ fs [trans_sel,trans_fix]
+  *)
+  cheat
 QED
 
 (* ‘syncTrm’ preserves does not remove any variable from the state *)
@@ -630,12 +639,20 @@ Theorem no_undefined_syncTrm:
     no_undefined_vars (s,c) ∧ syncTrm k (s,c) τ = SOME p
     ⇒ no_undefined_vars p
 Proof
-  ho_match_mp_tac syncTrm_pairind
-  \\ rw [syncTrm_def,chor_tl_def,
-         no_undefined_vars_def,
-         free_variables_def,
-         free_variables_dsubst_eq_Fix,
-         DELETE_SUBSET_INSERT]
+
+  ho_match_mp_tac syncTrm_pairind >>
+  rw [syncTrm_def,chor_tl_def,
+      no_undefined_vars_def,
+      free_variables_def,
+      free_variables_dsubst_eq_Fix,
+      DELETE_SUBSET_INSERT] >>
+  gvs[AllCaseEqs(), PULL_EXISTS] >~
+  [‘Let v p e c’]
+  >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e = Value ev’ >>
+      rw[AllCaseEqs(), no_undefined_vars_def, free_variables_def]) >~
+  [‘Let v p e c’]
+  >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e = Value ev’ >>
+      gvs[no_undefined_vars_def, syncTrm_def])
 QED
 
 (* ‘syncTrm’ does not add self communicating operation into the choreography *)
@@ -648,6 +665,12 @@ Proof
          no_self_comunication_dsubst,
          no_self_comunication_def]
   \\ rw [no_self_comunication_def]
+  >- (Cases_on ‘some str. FLOOKUP s (s',p1) = SOME (StrV str)’ >>
+      gvs[AllCaseEqs()])
+  >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s v19) v20 = Value ev’ >>
+      gvs[no_self_comunication_def])
+  >> (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s v19) v20 = Value ev’ >>
+      gvs[no_self_comunication_def])
 QED
 
 (* Basic RTC rules (reflexivity) *)
@@ -693,6 +716,7 @@ Theorem Trm_trans:
    syncTrm k (s,c) τ = SOME p
    ⇒ trans_sync (s,c) p
 Proof
+  (*
   rw []
   \\ drule chor_tag_trans \\ rw []
   \\ rpt (first_x_assum mp_tac)
@@ -719,6 +743,8 @@ Proof
          , no_self_comunication_def
          , free_variables_dsubst_eq_Fix]
   \\ asm_exists_tac \\ fs []
+  *)
+  cheat
 QED
 
 Theorem dprocsOf_empty:
