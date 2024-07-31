@@ -10,6 +10,7 @@ Datatype:
         | LCom proc varN proc varN
         | LSel proc bool proc
         | LLet varN proc exp (exp value result)
+        | LComExn proc varN proc varN
 End
 
 Definition freeprocs_def:
@@ -159,7 +160,7 @@ Inductive trans:
 [~com_exn:]
   ∀s v1 p1 v2 p2 c v.
   FLOOKUP s (v1,p1) = SOME v ∧ (∀s. v ≠ StrV s)
-  ⇒ trans (s,Com p1 v1 p2 v2 c) (LCom p1 v1 p2 v2,[]) (s,Nil)
+  ⇒ trans (s,Com p1 v1 p2 v2 c) (LComExn p1 v1 p2 v2,[]) (s,Nil)
 
 [~sel:]
   (* Selection *)

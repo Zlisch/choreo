@@ -234,11 +234,11 @@ End
 Theorem trans_state:
   ∀s c α τ s' c'. trans (s,c) (α,τ) (s',c') ⇒ s' = state_from_tag s α
 Proof
-  (* 
+  (*
   ho_match_mp_tac trans_pairind
   \\ rw [state_from_tag_def]
   \\ fs [FLOOKUP_DEF]
-    *)
+   *)
   cheat
 QED
 
@@ -543,7 +543,9 @@ Definition chor_tl_def:
   chor_tl s Nil             = (s,Nil)
 ∧ chor_tl s (Call v)        = (s,Call v)
 ∧ chor_tl s (Fix dn c)      = (s,dsubst c dn (Fix dn c))
-∧ chor_tl s (Com p v q x c) = (s |+ ((x,q),(THE o FLOOKUP s) (v,p)),c)
+∧ chor_tl s (Com p v q x c) = (case FLOOKUP s (v,p) of
+                                 SOME (StrV d) => (s|+((x,q), StrV d), c)
+                               | _ => (s,Nil))
 ∧ chor_tl s (Sel p b q c)   = (s,c)
 ∧ chor_tl s (Let v p e c) =
   (case some ev. ∃ cl. eval_exp cl (localise s p) e = Value ev of
@@ -614,7 +616,7 @@ Theorem chor_tag_trans:
    ∧ syncTrm k (s,c) (chor_tag c) = SOME p
    ⇒ trans (s,c) (chor_tag c,[]) p
 Proof
-  (*
+(*
   rw [] \\ Cases_on ‘c’
   \\ fs [ chor_tag_def,syncTrm_def,chor_match_def
         , chor_tl_def,no_self_comunication_def]
@@ -629,7 +631,7 @@ Proof
   >- (drule no_undefined_FLOOKUP_let \\ rw []
      \\  fs [trans_letval, trans_letexn])
   \\ fs [trans_sel,trans_fix]
-  *)
+*)
   cheat
 QED
 
@@ -647,12 +649,15 @@ Proof
       free_variables_dsubst_eq_Fix,
       DELETE_SUBSET_INSERT] >>
   gvs[AllCaseEqs(), PULL_EXISTS] >~
-  [‘Let v p e c’]
+  [‘chor_match _ (Let v p e c)’]
   >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e = Value ev’ >>
       rw[AllCaseEqs(), no_undefined_vars_def, free_variables_def]) >~
-  [‘Let v p e c’]
+  [‘~chor_match _ (Let v p e c)’]
   >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e = Value ev’ >>
-      gvs[no_undefined_vars_def, syncTrm_def])
+      gvs[no_undefined_vars_def, syncTrm_def]) >~
+  [‘chor_match l (Com p1 s1 p2 s2 c)’, ‘FLOOKUP s’]
+  >> Cases_on ‘FLOOKUP s (s1,p1)’ >> simp[no_undefined_vars_def, free_variables_def] >~
+  [‘FLOOKUP _ _ = SOME v’] >> Cases_on ‘v’ >> simp[no_undefined_vars_def, free_variables_def]
 QED
 
 (* ‘syncTrm’ does not add self communicating operation into the choreography *)
@@ -664,12 +669,15 @@ Proof
          free_variables_dsubst_eq_Fix,
          no_self_comunication_dsubst,
          no_self_comunication_def]
-  \\ rw [no_self_comunication_def]
-  >- (Cases_on ‘some str. FLOOKUP s (s',p1) = SOME (StrV str)’ >>
-      gvs[AllCaseEqs()])
-  >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s v19) v20 = Value ev’ >>
-      gvs[no_self_comunication_def])
-  >> (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s v19) v20 = Value ev’ >>
+  \\ rw [no_self_comunication_def] >~
+  [‘~chor_match l (Com p1 s1 p2 s2 c)’]
+  >- ( gvs[AllCaseEqs()]) >~
+  [‘chor_match l (Com p1 s1 p2 s2 c)’]
+  >- ( gvs[AllCaseEqs(), no_self_comunication_def]) >~
+  [‘chor_match l (Let _ _ _ _)’]
+  >-  ( gvs[AllCaseEqs(), no_self_comunication_def]) >~
+  [‘~chor_match _ (Let e1 p e2 c)’]
+  >> (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e2 = Value ev’ >>
       gvs[no_self_comunication_def])
 QED
 
@@ -716,7 +724,7 @@ Theorem Trm_trans:
    syncTrm k (s,c) τ = SOME p
    ⇒ trans_sync (s,c) p
 Proof
-  (*
+ 
   rw []
   \\ drule chor_tag_trans \\ rw []
   \\ rpt (first_x_assum mp_tac)
@@ -732,7 +740,8 @@ Proof
         , free_variables_def
         , trans_sync_one
         , trans_sync_refl
-        , chor_tag_def]
+        , chor_tag_def] >>~-
+        ([‘IfThen e p c1 c2’], irule trans_sync_one >> first_assum (irule_at Any) >> first_assum (irule_at Any))
   \\ first_x_assum (qspec_then ‘k’ assume_tac) \\ rfs []
   \\ TRY (ho_match_mp_tac trans_sync_one \\ asm_exists_tac \\ fs [])
   \\ ho_match_mp_tac trans_sync_step \\ asm_exists_tac \\ fs []
@@ -743,7 +752,7 @@ Proof
          , no_self_comunication_def
          , free_variables_dsubst_eq_Fix]
   \\ asm_exists_tac \\ fs []
-  *)
+ 
   cheat
 QED
 
