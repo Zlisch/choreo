@@ -19,6 +19,7 @@ Definition freeprocs_def:
 ∧ freeprocs (LCom p1 v1 p2 v2) = {p1;p2}
 ∧ freeprocs (LSel p1 b p2)     = {p1;p2}
 ∧ freeprocs (LLet v p e r)     = {p}
+∧ freeprocs (LComExn p1 v1 p2 v2) = {p1;p2}
 End
 
 Definition sender_def:
@@ -27,6 +28,7 @@ Definition sender_def:
 ∧ sender (LCom p1 v1 p2 v2)  = SOME p1
 ∧ sender (LSel p1 b p2)      = SOME p1
 ∧ sender (LLet v p e r)      = NONE
+∧ sender (LComExn p1 v1 p2 v2)  = SOME p1
 End
 
 Definition receiver_def:
@@ -35,6 +37,7 @@ Definition receiver_def:
 ∧ receiver (LCom p1 v1 p2 v2)  = SOME p2
 ∧ receiver (LSel p1 b p2)      = SOME p2
 ∧ receiver (LLet v p e r)      = NONE
+∧ receiver (LComExn p1 v1 p2 v2)  = SOME p2
 End
 
 Definition written_def:
@@ -43,6 +46,7 @@ Definition written_def:
 ∧ written (LCom p1 v1 p2 v2)  = SOME(v2,p2)
 ∧ written (LSel p1 b p2)      = NONE
 ∧ written (LLet v p e r)      = SOME(v,p)
+∧ written (LComExn p1 v1 p2 v2)  = NONE
 End
 
 Definition read_def:
@@ -51,6 +55,7 @@ Definition read_def:
 ∧ read (LCom p1 v1 p2 v2) = {(v1,p1)}
 ∧ read (LSel p1 b p2)     = {}
 ∧ read (LLet v p e r)     = {(s, p) | s ∈ free_vars e}
+∧ read (LComExn p1 v1 p2 v2) = {(v1,p1)}
 End
 
 (* The set of all processes in a choreography *)

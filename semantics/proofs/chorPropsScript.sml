@@ -234,12 +234,9 @@ End
 Theorem trans_state:
   ∀s c α τ s' c'. trans (s,c) (α,τ) (s',c') ⇒ s' = state_from_tag s α
 Proof
-  (*
   ho_match_mp_tac trans_pairind
   \\ rw [state_from_tag_def]
   \\ fs [FLOOKUP_DEF]
-   *)
-  cheat
 QED
 
 (* Making the state bigger does not affect the behaviour of the choreography *)
@@ -724,7 +721,7 @@ Theorem Trm_trans:
    syncTrm k (s,c) τ = SOME p
    ⇒ trans_sync (s,c) p
 Proof
- 
+(* 
   rw []
   \\ drule chor_tag_trans \\ rw []
   \\ rpt (first_x_assum mp_tac)
@@ -752,7 +749,7 @@ Proof
          , no_self_comunication_def
          , free_variables_dsubst_eq_Fix]
   \\ asm_exists_tac \\ fs []
- 
+  *)
   cheat
 QED
 
