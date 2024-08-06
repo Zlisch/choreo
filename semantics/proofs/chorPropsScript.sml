@@ -1,4 +1,4 @@
-open preamble choreoUtilsTheory chorSemTheory chorLangTheory richerLangTheory valueTheory envSemTheory finite_mapTheory;
+open preamble choreoUtilsTheory chorSemTheory chorLangTheory richerLangTheory valueTheory envSemTheory finite_mapTheory optionTheory;
 
 val _ = new_theory "chorProps";
 
@@ -327,7 +327,6 @@ Definition defined_vars_def:
 End
 
 Definition no_undefined_vars_def:
-  (* no_undefined_vars (s, Com p1 v1 p2 v2 c) = (free_variables c ⊆ FDOM s ∧ ∃ x. FLOOKUP s (v1,p1) = SOME (StrV x)) ∧ *)
   no_undefined_vars (s,c) = (free_variables c ⊆ FDOM s)
 End
 
@@ -512,20 +511,22 @@ Proof
 QED
 
 (* Check if a tag matches the head of a choreography *)
+(* allow exn and normal tags to match Let but exclude LComExn *)
 Definition chor_match_def:
-  chor_match (LCom p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x'))
-∧ chor_match (LSel p b q)    (Sel p' b' q' c)     = ((p,b,q)  = (p',b',q'))
-∧ chor_match (LLet v p e r)  (Let v' p' e' c)     = ((v,p,e) = (v',p',e'))
-∧ chor_match (LTau p v)      (IfThen v' p' c1 c2) = ((p,v)     = (p',v'))
-∧ chor_match  LFix           (Fix _ _)            = T
-∧ chor_match  _              _                    = F
+  chor_match s (LCom p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x') ∧
+                                                      ∃ d. FLOOKUP s (v',p') = SOME (StrV d))
+∧ chor_match _ (LSel p b q)    (Sel p' b' q' c)     = ((p,b,q)  = (p',b',q'))
+∧ chor_match _ (LLet v p e r)  (Let v' p' e' c)     = ((v,p,e) = (v',p',e'))
+∧ chor_match _ (LTau p v)      (IfThen v' p' c1 c2) = ((p,v)     = (p',v'))
+∧ chor_match _  LFix           (Fix _ _)            = T
+∧ chor_match _  _              _                    = F
 End
 
 (* Generates the corresponding tag that would consume
    the front of the choreography
 *)
 Definition chor_tag_def:
-  chor_tag (Com p v q x _)  = LCom p v q x
+  chor_tag (Com p v q x _)  = LCom p v q x (* only allow LCom to reach SOME in syncTrm *)
 ∧ chor_tag (Sel p b q _)    = LSel p b q
 ∧ chor_tag (Let v p e _)    = LLet v p e ARB
 ∧ chor_tag (IfThen v p _ _) = LTau p v
@@ -563,7 +564,7 @@ Definition syncTrm_def:
 ∧ syncTrm  k      (s,Call v) τ           = NONE
 ∧ syncTrm  k      (s,IfThen v p c1 c2) τ =
   (if (k = 0) then NONE
-   else if chor_match τ (IfThen v p c1 c2)
+   else if chor_match s τ (IfThen v p c1 c2)
    then SOME (chor_tl s (IfThen v p c1 c2))
    else if FLOOKUP s (v,p) = SOME (BoolV T)
    then syncTrm (k-1) (s,c1) τ
@@ -572,14 +573,14 @@ Definition syncTrm_def:
    else NONE)
 ∧ syncTrm k (s, Com p1 v1 p2 v2 c) τ =
   (if k = 0 then NONE
-   else if chor_match τ (Com p1 v1 p2 v2 c)
+   else if chor_match s τ (Com p1 v1 p2 v2 c)
    then SOME (chor_tl s (Com p1 v1 p2 v2 c))
    else case some str. FLOOKUP s (v1,p1) = SOME (StrV str) of
           NONE => NONE
         | SOME str => syncTrm (k-1) (s|+((v2,p2), (StrV str)), c) τ)
 ∧ syncTrm k (s,c) τ =
   (if (k = 0) then NONE
-   else if chor_match τ c
+   else if chor_match s τ c
    then SOME (chor_tl s c)
    else syncTrm (k-1) (chor_tl s c) τ)
 End
@@ -604,7 +605,7 @@ QED
 (* A choreography can always advance synchronously consuming
    the operation at the front
  *)
-(* com_val issue, need SOME StrV x instead of SOME x *)
+(* LLet v p e ARB issue *)
 Theorem chor_tag_trans:
   ∀s c k p.
    no_undefined_vars (s,c)
@@ -623,10 +624,13 @@ Proof
       \\ drule no_undefined_FLOOKUP_if \\ rw [] \\ fs []
       >- fs [trans_if_false]
       >> irule trans_if_exn >> metis_tac[is_BoolV_def, not_BoolV])
-  >- (drule no_undefined_FLOOKUP_com \\ rw []
-     \\  fs [trans_com])
-  >- (drule no_undefined_FLOOKUP_let \\ rw []
-     \\  fs [trans_letval, trans_letexn])
+  >- gvs[trans_com]
+  >- (drule no_undefined_FLOOKUP_let \\ rw [] >>
+      Cases_on ‘some r. ∃cl. eval_exp cl (localise s s') e = r’ >>
+      gvs[AllCaseEqs(), chor_match_def, syncTrm_def] >>
+      irule trans_letval >> rw[]
+
+      \\  fs [trans_letval, trans_letexn])
   \\ fs [trans_sel,trans_fix]
 *)
   cheat
@@ -638,7 +642,6 @@ Theorem no_undefined_syncTrm:
     no_undefined_vars (s,c) ∧ syncTrm k (s,c) τ = SOME p
     ⇒ no_undefined_vars p
 Proof
-
   ho_match_mp_tac syncTrm_pairind >>
   rw [syncTrm_def,chor_tl_def,
       no_undefined_vars_def,
@@ -646,13 +649,13 @@ Proof
       free_variables_dsubst_eq_Fix,
       DELETE_SUBSET_INSERT] >>
   gvs[AllCaseEqs(), PULL_EXISTS] >~
-  [‘chor_match _ (Let v p e c)’]
+  [‘chor_match _ _ (Let v p e c)’]
   >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e = Value ev’ >>
       rw[AllCaseEqs(), no_undefined_vars_def, free_variables_def]) >~
-  [‘~chor_match _ (Let v p e c)’]
+  [‘~chor_match _ _ (Let v p e c)’]
   >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e = Value ev’ >>
       gvs[no_undefined_vars_def, syncTrm_def]) >~
-  [‘chor_match l (Com p1 s1 p2 s2 c)’, ‘FLOOKUP s’]
+  [‘chor_match _ l (Com p1 s1 p2 s2 c)’, ‘FLOOKUP s’]
   >> Cases_on ‘FLOOKUP s (s1,p1)’ >> simp[no_undefined_vars_def, free_variables_def] >~
   [‘FLOOKUP _ _ = SOME v’] >> Cases_on ‘v’ >> simp[no_undefined_vars_def, free_variables_def]
 QED
@@ -667,13 +670,13 @@ Proof
          no_self_comunication_dsubst,
          no_self_comunication_def]
   \\ rw [no_self_comunication_def] >~
-  [‘~chor_match l (Com p1 s1 p2 s2 c)’]
+  [‘~chor_match _ l (Com p1 s1 p2 s2 c)’]
   >- ( gvs[AllCaseEqs()]) >~
-  [‘chor_match l (Com p1 s1 p2 s2 c)’]
+  [‘chor_match _ l (Com p1 s1 p2 s2 c)’]
   >- ( gvs[AllCaseEqs(), no_self_comunication_def]) >~
-  [‘chor_match l (Let _ _ _ _)’]
+  [‘chor_match _ l (Let _ _ _ _)’]
   >-  ( gvs[AllCaseEqs(), no_self_comunication_def]) >~
-  [‘~chor_match _ (Let e1 p e2 c)’]
+  [‘~chor_match _ _ (Let e1 p e2 c)’]
   >> (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e2 = Value ev’ >>
       gvs[no_self_comunication_def])
 QED
@@ -721,7 +724,7 @@ Theorem Trm_trans:
    syncTrm k (s,c) τ = SOME p
    ⇒ trans_sync (s,c) p
 Proof
-(* 
+(*
   rw []
   \\ drule chor_tag_trans \\ rw []
   \\ rpt (first_x_assum mp_tac)
@@ -737,9 +740,42 @@ Proof
         , free_variables_def
         , trans_sync_one
         , trans_sync_refl
-        , chor_tag_def] >>~-
-        ([‘IfThen e p c1 c2’], irule trans_sync_one >> first_assum (irule_at Any) >> first_assum (irule_at Any))
-  \\ first_x_assum (qspec_then ‘k’ assume_tac) \\ rfs []
+        , chor_tag_def]
+  (* if *) >~
+  [‘chor_match s l (IfThen v p c1 c2)’, ‘FLOOKUP s (v,p) ≠ SOME (BoolV F)’, ‘FLOOKUP s (v,p) ≠ SOME (BoolV T)’]
+  >- (gvs[] >> irule trans_sync_one >> first_assum (irule_at Any) >> first_assum (irule_at Any)) >~
+  [‘¬chor_match s l (IfThen v p c1 c2)’, ‘FLOOKUP s (v,p) = SOME (BoolV T)’, ‘FLOOKUP s (v,p) = SOME (BoolV F)’]
+  >- (gvs[] >> irule trans_sync_one >> first_assum (irule_at Any) >> first_assum (irule_at Any)) >>~-
+  ([‘IfThen v p c1 c2’], first_x_assum $ drule_all_then $ strip_assume_tac >>
+                         ho_match_mp_tac trans_sync_step \\ asm_exists_tac \\ fs [] >> rw[trans_sync_refl] >>
+                         first_x_assum irule \\ rw [] >>
+                         TRY (irule chor_tag_trans) >>
+                         fs [no_undefined_vars_def,DELETE_SUBSET_INSERT] >>
+                         rw [no_self_comunication_dsubst, no_self_comunication_def, free_variables_dsubst_eq_Fix] >>
+                         asm_exists_tac \\ fs [])
+  (* com *) >~
+  [‘chor_match s τ (Com p1 v1 p2 v2 c)’]
+  >- (Cases_on ‘τ’ >~
+      [‘chor_match s (LCom p1 v1 p2 v2) _’]
+      >- (gvs[chor_match_def] >> first_x_assum $ drule_all_then $ strip_assume_tac >>
+          irule  trans_sync_one >> metis_tac[])
+      >> gvs[chor_match_def]) >~
+  [‘¬chor_match s τ (Com p1 v1 p2 v2 c)’]
+  >- (gvs[AllCaseEqs(), PULL_EXISTS, some_def] >>
+      first_x_assum $ drule_all_then $ strip_assume_tac >>
+      ho_match_mp_tac trans_sync_step \\ asm_exists_tac \\ fs [] >>
+      first_x_assum irule \\ rw [] >>
+      TRY (irule chor_tag_trans) >>
+      fs [no_undefined_vars_def,DELETE_SUBSET_INSERT] >>
+      rw [no_self_comunication_dsubst, no_self_comunication_def, free_variables_dsubst_eq_Fix] >>
+      asm_exists_tac \\ fs []) 
+  (* Let *) >~
+  [‘chor_match s l (Let v p e c)’]
+  >- (first_x_assum $ drule_all_then $ strip_assume_tac >>
+     )
+
+                  
+  >> (first_x_assum (qspec_then ‘k’ assume_tac) \\ rfs []
   \\ TRY (ho_match_mp_tac trans_sync_one \\ asm_exists_tac \\ fs [])
   \\ ho_match_mp_tac trans_sync_step \\ asm_exists_tac \\ fs []
   \\ first_x_assum irule \\ rw []
@@ -748,8 +784,8 @@ Proof
   \\ rw [no_self_comunication_dsubst
          , no_self_comunication_def
          , free_variables_dsubst_eq_Fix]
-  \\ asm_exists_tac \\ fs []
-  *)
+  \\ asm_exists_tac \\ fs [])
+*)
   cheat
 QED
 
