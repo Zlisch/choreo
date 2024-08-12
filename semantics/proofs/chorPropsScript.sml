@@ -511,26 +511,30 @@ Proof
 QED
 
 (* Check if a tag matches the head of a choreography *)
-(* allow exn and normal tags to match Let but exclude LComExn *)
 Definition chor_match_def:
-  chor_match s (LCom p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x') ∧
-                                                      ∃ d. FLOOKUP s (v',p') = SOME (StrV d))
-∧ chor_match _ (LSel p b q)    (Sel p' b' q' c)     = ((p,b,q)  = (p',b',q'))
-∧ chor_match _ (LLet v p e r)  (Let v' p' e' c)     = ((v,p,e) = (v',p',e'))
-∧ chor_match _ (LTau p v)      (IfThen v' p' c1 c2) = ((p,v)     = (p',v'))
-∧ chor_match _  LFix           (Fix _ _)            = T
-∧ chor_match _  _              _                    = F
+  chor_match  (LCom p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x'))
+∧ chor_match  (LComExn p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x'))
+∧ chor_match  (LSel p b q)    (Sel p' b' q' c)     = ((p,b,q)  = (p',b',q'))
+∧ chor_match  (LLet v p e r)  (Let v' p' e' c)     = ((v,p,e) = (v',p',e'))
+∧ chor_match  (LTau p v)      (IfThen v' p' c1 c2) = ((p,v)     = (p',v'))
+∧ chor_match   LFix           (Fix _ _)            = T
+∧ chor_match   _              _                    = F
 End
 
 (* Generates the corresponding tag that would consume
    the front of the choreography
 *)
 Definition chor_tag_def:
-  chor_tag (Com p v q x _)  = LCom p v q x (* only allow LCom to reach SOME in syncTrm *)
-∧ chor_tag (Sel p b q _)    = LSel p b q
-∧ chor_tag (Let v p e _)    = LLet v p e ARB
-∧ chor_tag (IfThen v p _ _) = LTau p v
-∧ chor_tag (Fix _ _)        = LFix
+  chor_tag s (Com p v q x _)  = (case FLOOKUP s (v,p) of
+                                   SOME (StrV d) => LCom p v q x
+                                 | _ => LComExn p v q x)
+∧ chor_tag _ (Sel p b q _)    = LSel p b q
+∧ chor_tag s (Let v p e _)    =
+  (case some r. ∃ cl. eval_exp cl (localise s p) e = r ∧ r ∉ {Timeout; TypeError} of
+     NONE => LLet v p e Timeout
+   | SOME r => LLet v p e r)
+∧ chor_tag _ (IfThen v p _ _) = LTau p v
+∧ chor_tag _ (Fix _ _)        = LFix
 End
 
 
@@ -564,7 +568,7 @@ Definition syncTrm_def:
 ∧ syncTrm  k      (s,Call v) τ           = NONE
 ∧ syncTrm  k      (s,IfThen v p c1 c2) τ =
   (if (k = 0) then NONE
-   else if chor_match s τ (IfThen v p c1 c2)
+   else if chor_match τ (IfThen v p c1 c2)
    then SOME (chor_tl s (IfThen v p c1 c2))
    else if FLOOKUP s (v,p) = SOME (BoolV T)
    then syncTrm (k-1) (s,c1) τ
@@ -573,14 +577,14 @@ Definition syncTrm_def:
    else NONE)
 ∧ syncTrm k (s, Com p1 v1 p2 v2 c) τ =
   (if k = 0 then NONE
-   else if chor_match s τ (Com p1 v1 p2 v2 c)
+   else if chor_match  τ (Com p1 v1 p2 v2 c)
    then SOME (chor_tl s (Com p1 v1 p2 v2 c))
    else case some str. FLOOKUP s (v1,p1) = SOME (StrV str) of
           NONE => NONE
         | SOME str => syncTrm (k-1) (s|+((v2,p2), (StrV str)), c) τ)
 ∧ syncTrm k (s,c) τ =
-  (if (k = 0) then NONE
-   else if chor_match s τ c
+  (if (k = 0) ∨ is_bad_label τ then NONE
+   else if chor_match τ c
    then SOME (chor_tl s c)
    else syncTrm (k-1) (chor_tl s c) τ)
 End
@@ -611,28 +615,43 @@ Theorem chor_tag_trans:
    no_undefined_vars (s,c)
    ∧ not_finish c
    ∧ no_self_comunication c
-   ∧ syncTrm k (s,c) (chor_tag c) = SOME p
-   ⇒ trans (s,c) (chor_tag c,[]) p
+   ∧ syncTrm k (s,c) (chor_tag s c) = SOME p
+   ⇒ trans (s,c) (chor_tag s c,[]) p
 Proof
-(*
   rw [] \\ Cases_on ‘c’
   \\ fs [ chor_tag_def,syncTrm_def,chor_match_def
         , chor_tl_def,no_self_comunication_def]
-  \\ rveq
+  \\ rveq >~
+  [‘IfThen v p c1 c2’]
   >- (IF_CASES_TAC
       >- fs [trans_if_true]
       \\ drule no_undefined_FLOOKUP_if \\ rw [] \\ fs []
       >- fs [trans_if_false]
-      >> irule trans_if_exn >> metis_tac[is_BoolV_def, not_BoolV])
-  >- gvs[trans_com]
-  >- (drule no_undefined_FLOOKUP_let \\ rw [] >>
-      Cases_on ‘some r. ∃cl. eval_exp cl (localise s s') e = r’ >>
-      gvs[AllCaseEqs(), chor_match_def, syncTrm_def] >>
-      irule trans_letval >> rw[]
+      >> irule trans_if_exn >> metis_tac[is_BoolV_def, not_BoolV]) >~
+  [‘Com p1 v1 p2 v2 c’]
+  >- (Cases_on ‘FLOOKUP s (v1,p1)’ >> gvs[]
+      >- (drule no_undefined_FLOOKUP_com >> simp[]) >~
+      [‘FLOOKUP _ _ = SOME v’]
+      >> Cases_on ‘v’ >> gvs[] >>~-
+                            ([‘LComExn’], irule trans_com_exn >> simp[])
+      >> gvs[chor_match_def] >> irule trans_com >> simp[]) >~
+  [‘Let v p e c’]
+  >- (CASE_TAC
+      >- (gvs[chor_match_def] >> gvs[syncTrm_def])
+      >> qpat_x_assum ‘(some) _ = SOME _’ mp_tac >>
+      DEEP_INTRO_TAC some_intro >> simp[] >> strip_tac >>
+                     gvs[syncTrm_def]
+
+
+
+  drule no_undefined_FLOOKUP_let \\ rw [] >>
+  Cases_on ‘some r. ∃cl. eval_exp cl (localise s s') e = r’ >>
+  gvs[AllCaseEqs(), chor_match_def, syncTrm_def] >>
+  irule trans_letval >> rw[]
 
       \\  fs [trans_letval, trans_letexn])
   \\ fs [trans_sel,trans_fix]
-*)
+
   cheat
 QED
 

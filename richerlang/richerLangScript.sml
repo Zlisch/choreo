@@ -17,7 +17,7 @@ Datatype:
 End
 
 Datatype:
-  typeL = intT | strT | boolT | fnT typeL typeL | pairT typeL typeL | sumT typeL typeL
+  type = intT | strT | boolT | fnT type type | pairT type type | sumT type type
 End        
     
 Datatype:
