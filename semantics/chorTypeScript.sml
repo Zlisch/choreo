@@ -23,7 +23,10 @@ Inductive chorTypecheckOK:
 [~fix:] ∀ Γ Θ c. chorTypecheckOK Γ (Θ ∪ {dn}) c ⇒ chorTypecheckOK Γ Θ (Fix dn c)
 End
 
-(* chorEnvtype *)
+Definition chorEnvtype_def:
+  chorEnvtype Γ Δ = ∀ str p ty. FLOOKUP Γ (str,p) = SOME ty ⇒
+                                ∃ v. FLOOKUP Δ (str,p) = SOME v ∧ value_type v ty
+End
 
 val _ = export_theory();
 

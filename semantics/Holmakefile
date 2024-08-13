@@ -1,5 +1,5 @@
 ifndef CAKEDIR
-CAKEDIR = ../../cakeml-2274
+CAKEDIR = ../../cakeml
 endif
 
 ifndef CHOREODIR

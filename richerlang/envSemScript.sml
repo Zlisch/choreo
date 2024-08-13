@@ -1,4 +1,4 @@
-open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory pred_setTheory optionTheory;
+open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory pred_setTheory optionTheory realaxTheory;
 
 val _ = new_theory "envSem";
 
@@ -35,13 +35,13 @@ Definition eval_exp_def:
   eval_exp c E (Fn s e) = return (Clos s e (DRESTRICT E (free_vars e) \\ s))
   ∧
   eval_exp c E (App e1 e2) = (if c>0 then
-                               do
-                                 v1 <- eval_exp c E e1;
-                                 v2 <- eval_exp c E e2;
-                                 case v1 of
-                                   (Clos s e E1) => eval_exp (c-1) (E1 |+ (s,v2)) e
-                                 | _ => TypeError
-                               od
+                                do
+                                  v1 <- eval_exp c E e1;
+                                  v2 <- eval_exp c E e2;
+                                  case v1 of
+                                    (Clos s e E1) => eval_exp (c-1) (E1 |+ (s,v2)) e
+                                  | _ => TypeError
+                                od
                               else Timeout) ∧
   eval_exp c E (Case e s1 e1 s2 e2) = 
   do
@@ -213,6 +213,19 @@ Theorem clock_decrement:
 Proof
 *)
 
+Theorem clock_eval_exp_unique:
+  ∀ cl1 cl2 ev x E e. eval_exp cl1 E e = Value ev ∧ eval_exp cl2 E e = Value x ⇒
+                      ev = x
+Proof
+  rw[] >> Cases_on ‘cl1 < cl2’
+  >- (‘∀cl. cl ≥ cl1 ⇒ eval_exp cl E e = Value ev’ by metis_tac[clock_value_increment] >>
+      ‘cl2 ≥ cl1’ by gvs[real_ge, REAL_LT_IMP_LE] >>
+      ‘eval_exp cl2 E e = Value ev’ by metis_tac[] >> gvs[])
+  >> ‘cl2 ≤ cl1’ by simp[REAL_NOT_LT] >>
+  ‘∀cl. cl ≥ cl2 ⇒ eval_exp cl E e = Value x’ by metis_tac[clock_value_increment] >>
+  gvs[]
+QED
+
 Theorem localise_update_eqn:
   localise s p |+ (vn, v) = localise (s |+ ((vn, p), v)) p
 Proof
@@ -227,6 +240,12 @@ QED
 
 Theorem submap_localise:
   s ⊑ z ⇒ localise s p ⊑ localise z p
+Proof
+  cheat
+QED
+
+Theorem subset_fdom_localise_state:
+  A ⊆ FDOM (localise s p) ⇔ {(x,p) | x ∈ A} ⊆ FDOM s
 Proof
   cheat
 QED
@@ -385,6 +404,13 @@ Theorem eval_bigger_state_exn:
   eval_exp cl (localise z p) e = Exn exn
 Proof
   cheat
+QED
+
+Theorem eval_val_neq:
+  eval_exp cl (localise s p) e = x ∧ x ≠ Timeout ∧ x ≠ TypeError ⇒
+  (∃ ev. x = Value ev) ∨ (∃ exn. x = Exn exn)
+Proof
+  Cases_on ‘x’ >> gvs[]
 QED
 
 val _ = export_theory();
