@@ -1,4 +1,4 @@
-open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory pred_setTheory optionTheory realaxTheory;
+open HolKernel Parse boolLib bossLib richerLangTheory finite_mapTheory valueTheory pred_setTheory optionTheory
 
 val _ = new_theory "envSem";
 
@@ -218,11 +218,11 @@ Theorem clock_eval_exp_unique:
                       ev = x
 Proof
   rw[] >> Cases_on ‘cl1 < cl2’
-  >- (‘∀cl. cl ≥ cl1 ⇒ eval_exp cl E e = Value ev’ by metis_tac[clock_value_increment] >>
-      ‘cl2 ≥ cl1’ by gvs[real_ge, REAL_LT_IMP_LE] >>
+  >- (‘∀cl. cl ≥ cl1 ⇒ eval_exp cl E e = Value ev’ by metis_tac[clock_value_increment] >>      
+      ‘cl2 ≥ cl1’ by simp[] >>
       ‘eval_exp cl2 E e = Value ev’ by metis_tac[] >> gvs[])
-  >> ‘cl2 ≤ cl1’ by simp[REAL_NOT_LT] >>
-  ‘∀cl. cl ≥ cl2 ⇒ eval_exp cl E e = Value x’ by metis_tac[clock_value_increment] >>
+  >> ‘cl1 ≥ cl2’ by simp[] >>
+  ‘eval_exp cl1 E e = Value x’ by metis_tac[clock_value_increment] >>
   gvs[]
 QED
 
@@ -232,6 +232,12 @@ Proof
   cheat
 QED
 
+Theorem localise_update_neq:
+  p1 ≠ p2 ⇒ localise (s |+ ((vn,p1), v)) p2 = localise s p2
+Proof
+  cheat
+QED
+        
 Theorem submap_domsub2:
   s ⊑ z ⇒ s \\ x ⊑ z \\ x
 Proof
@@ -250,12 +256,20 @@ Proof
   cheat
 QED
 
+Theorem localise_fdom_subset:
+  FDOM (localise Γ p) ⊆ FDOM (localise Δ p) ⇒
+  FDOM Γ ⊆ FDOM Δ
+Proof
+  cheat
+QED
+
 Theorem envtype_fdom:
   envtype G E ⇒ FDOM G ⊆ FDOM E
 Proof
   rw[envtype_def, SUBSET_DEF, TO_FLOOKUP] >> metis_tac[option_CLAUSES]
 QED
 
+(* duplicated to envtype_lemma in richerlangTheory *)
 Theorem envtype_update:
   envtype G E ∧ value_type v t ⇒
   envtype (G|+(s,t)) (E|+(s,v))
@@ -372,6 +386,12 @@ Proof
   metis_tac[subset_update, UNION_DIFF_EQ, SUBSET_UNION, SUBSET_TRANS]
 QED
 
+Theorem subset_diff_same:
+  A ⊆ B ⇒ A DIFF C ⊆ B DIFF C
+Proof
+  rw[DIFF_DEF, SUBSET_DEF]
+QED
+
 Theorem eval_bigger_state_fv:
   ∀ cl s p ev z. eval_exp cl (localise s p) e = Value ev ∧
                  free_vars e ⊆ FDOM (localise s p) ∧ s ⊑ z ⇒
@@ -413,5 +433,13 @@ Proof
   Cases_on ‘x’ >> gvs[]
 QED
 
+Theorem typecheck_no_undefined_vars:
+  ∀ G ty. typecheck G e ty ⇒ free_vars e ⊆ FDOM G
+Proof
+  Induct_on ‘e’ >> rw[Once typecheck_rules, free_vars, FLOOKUP_DEF] >>
+  rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >>
+  metis_tac[subset_diff_same, FDOM_FUPDATE, INSERT_SING_UNION, UNION_COMM, DIFF_SAME_UNION, DIFF_SUBSET, SUBSET_TRANS]
+QED
+        
 val _ = export_theory();
 

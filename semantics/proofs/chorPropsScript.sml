@@ -660,7 +660,7 @@ Proof
           >- metis_tac[]
           >- (Cases_on ‘cl' ≥ cl’
           >- (‘∀cl1. cl1 ≥ cl ⇒ eval_exp cl1 (localise s p) e = Exn exn’ by metis_tac[clock_exn_increment] >> ‘eval_exp cl' (localise s p) e = Exn exn’ by metis_tac[] >> gvs[])
-          >> ‘cl' < cl’ by simp[real_ge, REAL_NOT_LT] >> 
+          >> ‘cl' < cl’ by simp[] >> 
               ‘∀cl. cl ≥ cl' ⇒ eval_exp cl (localise s p) e = Value x’ by metis_tac[clock_value_increment] >> gvs[])
           >> metis_tac[trans_letexn]))
       >> fs [trans_sel,trans_fix]
@@ -754,7 +754,6 @@ Theorem Trm_trans:
    syncTrm k (s,c) τ = SOME p
    ⇒ trans_sync (s,c) p
 Proof
-(*
   rw []
   \\ drule chor_tag_trans \\ rw []
   \\ rpt (first_x_assum mp_tac)
@@ -814,12 +813,12 @@ Proof
       asm_exists_tac \\ fs [])
   (* Let *) >~
   [‘chor_match l (Let v p e c)’]
-  >- (Cases_on ‘eval_exp cl (localise s p) e’
-      >- (gvs[]))
-
-
-
-
+  >- (qmatch_abbrev_tac ‘trans_sync _ (option_CASE A _ _)’ >>
+      qmatch_asmsub_abbrev_tac ‘¬is_bad_label (option_CASE B _ _)’ >>
+      Cases_on ‘A’ >> gvs[] >> Cases_on ‘B’ >> gvs[] >>
+      pop_assum mp_tac >> pop_assum mp_tac >>
+      rpt (DEEP_INTRO_TAC some_intro >> simp[] >> strip_tac) >>
+          
 
 
 
