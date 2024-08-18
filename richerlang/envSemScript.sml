@@ -226,6 +226,34 @@ Proof
   gvs[]
 QED
 
+Theorem clock_eval_exp_result:
+  eval_exp cl1 E e = Value ev ∧ eval_exp cl2 E e = r ∧ r ≠ Timeout ⇒
+                      r = Value ev
+Proof
+  rw[] >> Cases_on ‘cl1 ≤ cl2’
+  >- (‘cl2 ≥ cl1’ by simp[] >> ‘eval_exp cl2 E e = Value ev’ by metis_tac[clock_value_increment]
+      >> simp[])
+  >> ‘cl1 ≥ cl2’ by simp[] >> Cases_on ‘eval_exp cl2 E e’ >> metis_tac[clock_increment]
+QED
+
+Theorem clock_eval_exp_typeerr_false:
+  eval_exp cl (localise s p) e = TypeError ∧ eval_exp cl' (localise s p) e = Value x ⇒ F
+Proof
+  rw[] >> Cases_on ‘cl ≤ cl'’
+  >- (‘cl' ≥ cl’ by simp[] >> ‘eval_exp cl' (localise s p) e = TypeError’ by metis_tac[clock_typeerr_increment] >> simp[])
+  >> (‘cl ≥ cl'’ by simp[] >> spose_not_then assume_tac >>
+     ‘eval_exp cl (localise s p) e = Value x’ by metis_tac[clock_value_increment] >> gvs[])
+QED
+        
+Theorem clock_eval_exp_exn_false:
+  eval_exp cl (localise s p) e = Exn exn ∧ eval_exp cl' (localise s p) e = Value x ⇒ F
+Proof
+  rw[] >> Cases_on ‘cl ≤ cl'’
+  >- (‘cl' ≥ cl’ by simp[] >> ‘eval_exp cl' (localise s p) e = Exn exn’ by metis_tac[clock_exn_increment] >> simp[])
+  >> (‘cl ≥ cl'’ by simp[] >> spose_not_then assume_tac >>
+     ‘eval_exp cl (localise s p) e = Value x’ by metis_tac[clock_value_increment] >> gvs[])
+QED
+
 Theorem localise_update_eqn:
   localise s p |+ (vn, v) = localise (s |+ ((vn, p), v)) p
 Proof

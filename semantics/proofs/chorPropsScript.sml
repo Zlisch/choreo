@@ -514,6 +514,7 @@ Definition is_bad_label_def[simp]:
   is_bad_label _ = F
 End
 
+
 (* Check if a tag matches the head of a choreography *)
 Definition chor_match_def:
   chor_match  (LCom p v q x)  (Com p' v' q' x' c)  = ((p,v,q,x)  = (p',v',q',x'))
@@ -534,7 +535,7 @@ Definition chor_tag_def:
                                  | _ => LComExn p v q x)
 ∧ chor_tag _ (Sel p b q _)    = LSel p b q
 ∧ chor_tag s (Let v p e _)    =
-  (case some r. ∃ cl. eval_exp cl (localise s p) e = r ∧ r ∉ {Timeout; TypeError} of
+  (case some r. ∃ cl. eval_exp cl (localise s p) e = r ∧ r ≠ Timeout of
      NONE => LLet v p e Timeout
    | SOME r => LLet v p e r)
 ∧ chor_tag _ (IfThen v p _ _) = LTau p v
@@ -586,8 +587,16 @@ Definition syncTrm_def:
    else case some str. FLOOKUP s (v1,p1) = SOME (StrV str) of
           NONE => NONE
         | SOME str => syncTrm (k-1) (s|+((v2,p2), (StrV str)), c) τ)
-∧ syncTrm k (s,c) τ =
+∧ syncTrm k (s, Let v p e c) τ =
   (if (k = 0) ∨ is_bad_label τ then NONE
+   else if chor_match τ (Let v p e c)
+   then (case some r. ∃ cl. eval_exp cl (localise s p) e = r ∧ r ≠ Timeout of
+           SOME (Value ev) => SOME (s |+ ((v,p), ev),c)
+         | SOME (Exn _) => SOME (s, Nil)
+         | _ => NONE)
+   else syncTrm (k-1) (chor_tl s (Let v p e c)) τ)
+∧ syncTrm k (s,c) τ =
+  (if k = 0 then NONE
    else if chor_match τ c
    then SOME (chor_tl s c)
    else syncTrm (k-1) (chor_tl s c) τ)
@@ -649,21 +658,12 @@ Proof
   [‘Let v p e c’]
   >- (CASE_TAC
       >- gvs[chor_match_def]
-      >- (qpat_x_assum ‘(some) _ = SOME _’ mp_tac >>
+      >> (qpat_x_assum ‘(some) _ = SOME _’ mp_tac >>
           DEEP_INTRO_TAC some_intro >> simp[] >> strip_tac >>
-          drule eval_val_neq >> strip_tac >>
-          rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >>
           gvs[chor_match_def] >>
-          DEEP_INTRO_TAC some_intro >> simp[] >> rpt strip_tac
-          >- (drule no_undefined_vars_fv_localise_let >> strip_tac >>
-              metis_tac[clock_eval_exp_unique, trans_letval])
-          >- metis_tac[]
-          >- (Cases_on ‘cl' ≥ cl’
-          >- (‘∀cl1. cl1 ≥ cl ⇒ eval_exp cl1 (localise s p) e = Exn exn’ by metis_tac[clock_exn_increment] >> ‘eval_exp cl' (localise s p) e = Exn exn’ by metis_tac[] >> gvs[])
-          >> ‘cl' < cl’ by simp[] >> 
-              ‘∀cl. cl ≥ cl' ⇒ eval_exp cl (localise s p) e = Value x’ by metis_tac[clock_value_increment] >> gvs[])
-          >> metis_tac[trans_letexn]))
-      >> fs [trans_sel,trans_fix]
+          Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[] >>
+          metis_tac[trans_letval, no_undefined_vars_fv_localise_let, trans_letexn]))
+  >> fs [trans_sel,trans_fix]
 QED
 
 (* ‘syncTrm’ preserves does not remove any variable from the state *)
@@ -680,8 +680,7 @@ Proof
       DELETE_SUBSET_INSERT] >>
   gvs[AllCaseEqs(), PULL_EXISTS] >~
   [‘chor_match _ (Let v p e c)’]
-  >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e = Value ev’ >>
-      rw[AllCaseEqs(), no_undefined_vars_def, free_variables_def]) >~
+  >- rw[AllCaseEqs(), no_undefined_vars_def, free_variables_def] >~
   [‘~chor_match _ (Let v p e c)’]
   >- (Cases_on ‘some ev. ∃cl. eval_exp cl (localise s p) e = Value ev’ >>
       gvs[no_undefined_vars_def, syncTrm_def]) >~
@@ -813,19 +812,29 @@ Proof
       asm_exists_tac \\ fs [])
   (* Let *) >~
   [‘chor_match l (Let v p e c)’]
-  >- (qmatch_abbrev_tac ‘trans_sync _ (option_CASE A _ _)’ >>
-      qmatch_asmsub_abbrev_tac ‘¬is_bad_label (option_CASE B _ _)’ >>
+  >- (qmatch_asmsub_abbrev_tac ‘¬is_bad_label (option_CASE B _ _)’ >>
+      qmatch_asmsub_abbrev_tac ‘syncTrm _ (option_CASE A _ _) _’ >>
       Cases_on ‘A’ >> gvs[] >> Cases_on ‘B’ >> gvs[] >>
       pop_assum mp_tac >> pop_assum mp_tac >>
-      rpt (DEEP_INTRO_TAC some_intro >> simp[] >> strip_tac) >>
-          
-
-
-
-   (first_x_assum $ drule_all_then $ strip_assume_tac >>
-     )
-
-                  
+      rpt (DEEP_INTRO_TAC some_intro >> simp[] >> strip_tac)
+      >- (Cases_on ‘x’ >> gvs[chor_match_def] >> irule trans_sync_one >> metis_tac[])
+      >> (Cases_on ‘x'’ >> gvs[chor_match_def] >> irule trans_sync_one >> metis_tac[]))
+  >- (qmatch_asmsub_abbrev_tac ‘¬is_bad_label (option_CASE B _ _)’ >>
+      qmatch_asmsub_abbrev_tac ‘syncTrm _ (option_CASE A _ _) _’ >>
+      Cases_on ‘A’ >> gvs[] >> Cases_on ‘B’ >> gvs[] >>
+      pop_assum mp_tac >> pop_assum mp_tac >>
+      rpt (DEEP_INTRO_TAC some_intro >> simp[] >> strip_tac)
+      >- gvs[syncTrm_def]
+      >- (Cases_on ‘x’ >> gvs[chor_match_def, syncTrm_def])
+      >- (Cases_on ‘x'’ >> gvs[chor_match_def] >> ho_match_mp_tac trans_sync_step
+          >- (‘trans_sync (s |+ ((k',p),x),c) p'’ suffices_by metis_tac[clock_eval_exp_unique] >>
+              first_assum (irule_at Any) >>
+              ‘free_variables c ⊆ FDOM (s |+ ((k',p),x))’ by metis_tac[DELETE_DEF, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
+              ‘free_variables c ⊆ (k',p) INSERT FDOM s’ by gvs[FDOM_FUPDATE] >> simp[] >>
+              Cases_on ‘(c ≠ Nil ∧ ∀x. c ≠ Call x)’ >> simp[] >>
+              ‘no_undefined_vars (s |+ ((k',p),x),c)’ by simp[no_undefined_vars_def] >>
+              drule chor_tag_trans >> strip_tac >> metis_tac[not_finish_def])
+          >> metis_tac[clock_eval_exp_typeerr_false, clock_eval_exp_exn_false]))
   >> (first_x_assum (qspec_then ‘k’ assume_tac) \\ rfs []
   \\ TRY (ho_match_mp_tac trans_sync_one \\ asm_exists_tac \\ fs [])
   \\ ho_match_mp_tac trans_sync_step \\ asm_exists_tac \\ fs []
@@ -836,8 +845,6 @@ Proof
          , no_self_comunication_def
          , free_variables_dsubst_eq_Fix]
   \\ asm_exists_tac \\ fs [])
-*)
-  cheat
 QED
 
 Theorem dprocsOf_empty:
