@@ -58,5 +58,11 @@ Proof
       first_x_assum drule >> simp[] >> SET_TAC [])
 QED
 
+Theorem chortype_no_self_communication:
+  ∀ Γ Θ. chorTypecheckOK Γ Θ c ⇒ no_self_comunication c
+Proof
+  Induct_on ‘chorTypecheckOK’ >> rw[no_self_comunication_def]
+QED
+
 val _ = export_theory();
 

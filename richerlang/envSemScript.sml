@@ -39,6 +39,8 @@ Definition eval_exp_def:
                                   v1 <- eval_exp c E e1;
                                   v2 <- eval_exp c E e2;
                                   case v1 of
+                                    (* (Clos s e E1) => if s ∈ free_vars e then eval_exp (c-1) (E1 |+ (s,v2)) e
+                                                     else eval_exp (c-1) E e *)
                                     (Clos s e E1) => eval_exp (c-1) (E1 |+ (s,v2)) e
                                   | _ => TypeError
                                 od
@@ -99,9 +101,6 @@ Proof
 QED
 
 Theorem envtype_DRESTRICT:
-  (*
-  envtype G E ⇒ envtype (DRESTRICT G (FDOM (DRESTRICT E (free_vars e)))) (DRESTRICT E (free_vars e))
-  *)
   envtype G E ⇒ envtype (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) \\ s) (DRESTRICT E (free_vars e) \\ s)
 Proof
   rw[envtype_def] >>
@@ -115,18 +114,73 @@ Proof
   metis_tac[FLOOKUP_supermap]
 QED
 
+Theorem submap_domsub2:
+  s ⊑ z ⇒ s \\ x ⊑ z \\ x
+Proof
+  metis_tac[SUBMAP_DOMSUB_gen, SUBMAP_DOMSUB, SUBMAP_TRANS]
+QED
+
+Theorem submap_update_same:
+  s ⊑ z ⇒ s |+ (x,y) ⊑ z |+ (x,y)
+Proof
+  simp[submap_domsub2, SUBMAP_mono_FUPDATE]
+QED
+        
+Theorem subset_update:
+  A ⊆ B ⇒ A ∪ C ⊆ B ∪ C
+Proof
+  rw[SUBSET_DEF, UNION_DEF]
+QED
+        
+Theorem subset_diff_update:
+  A DIFF B ⊆ C ⇒ A ⊆ C ∪ B
+Proof
+  metis_tac[subset_update, UNION_DIFF_EQ, SUBSET_UNION, SUBSET_TRANS]
+QED
+
+Theorem subset_diff_same:
+  A ⊆ B ⇒ A DIFF C ⊆ B DIFF C
+Proof
+  rw[DIFF_DEF, SUBSET_DEF]
+QED
+
+Theorem diff_eq_same:
+  x ∉ A ⇒ A DIFF {x} = A
+Proof
+  cheat
+QED
+
+Theorem union_diff_subset_x:
+  A ⊆ B ∪ {x} ⇒ A DIFF {x} ⊆ B
+Proof
+  Cases_on ‘x ∈ B’
+  >- (‘{x} ⊆ B’ by simp[SUBSET_DEF] >>
+      metis_tac[SUBSET_UNION_ABSORPTION, UNION_COMM, DIFF_SUBSET, SUBSET_TRANS])
+  >> metis_tac[DIFF_SAME_UNION, diff_eq_same, subset_diff_same]
+QED
+
+Theorem typecheck_env_submap:
+  typecheck G1 e ty ⇒
+  (∀ G2. free_vars e ⊆ FDOM G2 ∧ G2 ⊑ G1 ⇒ typecheck G2 e ty)
+Proof
+  Induct_on ‘typecheck’ >> rw[]
+  >- gvs[SUBMAP_DEF, FLOOKUP_DEF]
+  >> metis_tac[FDOM_FUPDATE, INSERT_SING_UNION, UNION_COMM, subset_diff_update,submap_domsub2, SUBMAP_mono_FUPDATE]
+QED
+
+Theorem typecheck_env_fv:
+  typecheck G e ty ⇒ free_vars e ⊆ FDOM G
+Proof
+  Induct_on ‘typecheck’ >> rw[]
+  >- gvs[FLOOKUP_DEF]
+  >> metis_tac[INSERT_SING_UNION, UNION_COMM, union_diff_subset_x]
+QED
+
 Theorem typecheck_drestrict:
   typecheck G e ty ∧ free_vars e ⊆ A ⇒
   typecheck (DRESTRICT G A) e ty
 Proof
-  (*
-  Induct_on ‘typecheck’ >> rw[]
-  >- simp[FLOOKUP_SIMP]
-  >- (‘{s} ⊆ A’ by simp[SUBSET_DEF] >> metis_tac[UNION_SUBSET, UNION_DIFF_EQ])
-  >- ()
-  >> metis_tac[]
-  *)
-  cheat
+  rw[] >> metis_tac[typecheck_env_fv, FDOM_DRESTRICT, SUBSET_INTER, SUBMAP_DRESTRICT, typecheck_env_submap]
 QED
 
 Theorem typecheck_update_sub_fv:
@@ -170,6 +224,15 @@ Proof
           >> ‘envtype (G |+ (s2, t2)) (E |+ (s2, v0))’ by simp[envtype_lemma] >>
           first_x_assum $ drule_all_then $ strip_assume_tac >> simp[])
       >> simp[])
+QED
+
+Theorem typecheck_value_type:
+  envtype G E ∧ typecheck G e ty ∧ eval_exp cl E e = Value v ⇒
+          value_type v ty
+Proof
+  rw[] >>
+  ‘(∃v. eval_exp cl E e = Value v ∧ value_type v ty) ∨
+   (∃exn. eval_exp cl E e = Exn exn) ∨ eval_exp cl E e = Timeout’ by metis_tac[type_soundness] >> gvs[]
 QED
 
 Theorem clock_value_increment:
@@ -254,38 +317,45 @@ Proof
      ‘eval_exp cl (localise s p) e = Value x’ by metis_tac[clock_value_increment] >> gvs[])
 QED
 
+Theorem localise_fdom:
+  FDOM (localise s p) = {x | (x,p) ∈ FDOM s}
+Proof
+  cheat
+QED
+
+Theorem localise_fapply:
+  (localise s p) ' x = s ' (x,p)
+Proof
+  cheat
+QED
+
 Theorem localise_update_eqn:
   localise s p |+ (vn, v) = localise (s |+ ((vn, p), v)) p
 Proof
-  cheat
+  rw[fmap_EXT, localise_fdom, INSERT_DEF, localise_fapply] >> gvs[FAPPLY_FUPDATE] >>
+  rw[FAPPLY_FUPDATE_THM, localise_fapply]
 QED
 
 Theorem localise_update_neq:
   p1 ≠ p2 ⇒ localise (s |+ ((vn,p1), v)) p2 = localise s p2
 Proof
-  cheat
-QED
-        
-Theorem submap_domsub2:
-  s ⊑ z ⇒ s \\ x ⊑ z \\ x
-Proof
-  cheat
-QED
+  rw[fmap_EXT, localise_fdom, localise_fapply, FAPPLY_FUPDATE_THM]
+QED       
 
 Theorem submap_localise:
   s ⊑ z ⇒ localise s p ⊑ localise z p
 Proof
-  cheat
+  rw[SUBMAP_DEF, localise_fdom] >> metis_tac[localise_fapply]
 QED
 
 Theorem subset_fdom_localise_state:
   A ⊆ FDOM (localise s p) ⇔ {(x,p) | x ∈ A} ⊆ FDOM s
 Proof
-  cheat
+  rw[localise_fdom, SUBSET_DEF] >> metis_tac[]
 QED
 
 Theorem localise_fdom_subset:
-  FDOM (localise Γ p) ⊆ FDOM (localise Δ p) ⇒
+  (∀ p. FDOM (localise Γ p) ⊆ FDOM (localise Δ p)) ⇒
   FDOM Γ ⊆ FDOM Δ
 Proof
   cheat
@@ -400,24 +470,6 @@ Proof
   irule $ iffRL $ DRESTRICT_EQ_DRESTRICT_SAME >>
   ‘localise s' p ⊑ localise z p’ by simp[submap_localise] >> rw [] >>
   metis_tac[DOMSUB_FAPPLY_NEQ, SUBMAP_DEF, delete_inter_eq, DELETE_DEF, SUBMAP_FDOM_SUBSET, subset_absortion]
-QED
-
-Theorem subset_update:
-  A ⊆ B ⇒ A ∪ C ⊆ B ∪ C
-Proof
-  rw[SUBSET_DEF, UNION_DEF]
-QED
-
-Theorem subset_diff_update:
-  A DIFF B ⊆ C ⇒ A ⊆ C ∪ B
-Proof
-  metis_tac[subset_update, UNION_DIFF_EQ, SUBSET_UNION, SUBSET_TRANS]
-QED
-
-Theorem subset_diff_same:
-  A ⊆ B ⇒ A DIFF C ⊆ B DIFF C
-Proof
-  rw[DIFF_DEF, SUBSET_DEF]
 QED
 
 Theorem eval_bigger_state_fv:

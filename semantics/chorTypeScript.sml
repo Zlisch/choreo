@@ -9,10 +9,10 @@ Inductive chorTypecheckOK:
 [~nil:] ∀ Γ Θ. chorTypecheckOK Γ Θ Nil
 [~com:] ∀ Γ Θ p1 v1 p2 v2 c. FLOOKUP Γ (v1,p1) = SOME strT ∧
                              FLOOKUP Γ (v2,p2) = SOME strT ∧
-                             ({p1;p2} ⊆ Θ) ∧
+                             ({p1;p2} ⊆ Θ) ∧ p1≠ p2 ∧
                              chorTypecheckOK Γ Θ c ⇒
                              chorTypecheckOK Γ Θ (Com p1 v1 p2 v2 c)
-[~sel:] ∀ Γ Θ p1 p2 b c. ({p1;p2} ⊆ Θ) ∧ chorTypecheckOK Γ Θ c ⇒
+[~sel:] ∀ Γ Θ p1 p2 b c. ({p1;p2} ⊆ Θ) ∧ p1 ≠ p2 ∧ chorTypecheckOK Γ Θ c ⇒
                          chorTypecheckOK Γ Θ (Sel p1 b p2 c)
 [~if:] ∀ Γ Θ v p c1 c2. FLOOKUP Γ (v,p) = SOME boolT ∧
                         chorTypecheckOK Γ Θ c1 ∧ chorTypecheckOK Γ Θ c2 ⇒
