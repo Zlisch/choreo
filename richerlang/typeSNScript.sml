@@ -1,6 +1,6 @@
 open HolKernel Parse boolLib bossLib;
 
-open richerLangTheory envSemTheory optionTheory finite_mapTheory;
+open richerLangTheory envSemTheory optionTheory finite_mapTheory pred_setTheory;
 
 val _ = new_theory "typeSN";
 
@@ -20,10 +20,9 @@ Termination
   WF_REL_TAC ‘inv_image (measure type_size) FST’
 End
 
-Definition envtype_sn_def:
-  envtype_sn G E ⇔
-    (* ∀ s ty. FLOOKUP G s = SOME ty ⇒ (∃ v. FLOOKUP E s = SOME v ∧ sn_v ty v) *)
-    ∀ s v. FLOOKUP E s = SOME v ⇒ (∃ ty. FLOOKUP G s = SOME ty ∧ sn_v ty v)
+Definition envsn_def:
+  envsn G E ⇔
+    ∀ s ty. FLOOKUP G s = SOME ty ⇒ (∃ v. FLOOKUP E s = SOME v ∧ sn_v ty v)
 End
 
 Definition sn_exec_def:
@@ -33,38 +32,50 @@ End
 
 Definition sn_e_def:
   sn_e G t e ⇔
-    ∀ E. envtype_sn G E ⇒ sn_exec t E e
+    ∀ E. envsn (DRESTRICT G (FDOM E)) E ⇒ sn_exec t E e
 End
 
-(*
-Theorem sn_v_value_type:
-  ∀ ty v. sn_v ty v ⇒ value_type v ty
+Theorem envsn_g_domsub_update:
+  envsn (G \\ s) E ∧ sn_v ty v ⇒
+  envsn (G |+ (s,ty)) (E |+ (s,v))
 Proof
-  (* recInduct sn_v_ind >> simp[sn_v_def] >> rw[] >>
-  irule value_type_FnV >> *)
-  cheat
+  rw[envsn_def] >> Cases_on ‘s = s'’ >> gvs[FLOOKUP_SIMP, DOMSUB_FLOOKUP_NEQ]
 QED
 
-Theorem envtype_sn_envtype:
-  envtype_sn G E ⇒ envtype G E
+(* utils *)
+Theorem drestrict_insert_domsub:
+  DRESTRICT G (s INSERT A) \\ s = DRESTRICT G (A DIFF {s})
 Proof
-  metis_tac[envtype_sn_def, envtype_def, sn_v_value_type]
+  rw[DRESTRICT_DOMSUB, DELETE_DEF, INSERT_DIFF]
 QED
-*)
+
+Theorem envsn_g_submap:
+  envsn G E ∧ G' ⊑ G ⇒ envsn G' E
+Proof
+  rw[envsn_def, SUBMAP_FLOOKUP_EQN]
+QED
+
+Theorem envsn_drestrict_submap:
+  envsn (DRESTRICT G (FDOM E)) E ∧ E' ⊑ E ⇒
+  envsn (DRESTRICT G (FDOM E')) E'
+Proof
+  rw[envsn_def] >>
+  ‘DRESTRICT G (FDOM E') ⊑ DRESTRICT G (FDOM E)’ by rw[SUBMAP_FDOM_SUBSET, DRESTRICT_SUBSET_SUBMAP] >>
+  ‘FLOOKUP (DRESTRICT G (FDOM E)) s = SOME ty’ by gvs[SUBMAP_FLOOKUP_EQN] >>
+  first_x_assum $ drule_all_then $ strip_assume_tac >>
+  ‘s ∈ FDOM E'’ by gvs[FLOOKUP_DEF, IN_INTER, FDOM_DRESTRICT] >>
+  metis_tac[FLOOKUP_DEF, SUBMAP_FLOOKUP_EQN]
+QED
 
 Theorem sn_lemma:
-(* ∀ G e t. typecheck G e t ∧ free_vars e = FDOM G ⇒ sn_e G t e *)
+  (* ∀ G e t. typecheck G e t ∧ free_vars e = FDOM G ⇒ sn_e G t e *)
   ∀ G e t. typecheck G e t ⇒ sn_e G t e
 Proof
   Induct_on ‘typecheck’ >> rw[sn_e_def, sn_v_def, eval_exp_def] >> gvs[AllCaseEqs(), PULL_EXISTS, result_bind_eq_value, sn_exec_def] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >~
   [‘Fn s e’, ‘fnT dt rt’]
   >- (rw[eval_exp_def] >> simp[sn_v_def] >> rpt strip_tac >> first_x_assum irule >>
-      simp[FLOOKUP_SIMP] >> rw[AllCaseEqs()]
-      >- (rename [‘FLOOKUP G s2 = SOME ty’] >>
-          ‘s2 ∈ FDOM G’ by metis_tac[flookup_thm] >>
-          ‘s2 ∈ free_vars e’ by ASM_SET_TAC [] >>
-          metis_tac[])
-      >> ASM_SET_TAC [])
+      simp[FLOOKUP_SIMP] >> rw[AllCaseEqs()] >> irule envsn_g_domsub_update >>
+     )
 
                                                                                      
         
@@ -93,6 +104,22 @@ Proof
       >> ASM_SET_TAC [])
 QED
 
+(*
+Theorem sn_v_value_type:
+  ∀ ty v. sn_v ty v ⇒ value_type v ty
+Proof
+  (* recInduct sn_v_ind >> simp[sn_v_def] >> rw[] >>
+  irule value_type_FnV >> *)
+  cheat
+QED
 
+Theorem envtype_sn_envtype:
+  envtype_sn G E ⇒ envtype G E
+Proof
+  metis_tac[envtype_sn_def, envtype_def, sn_v_value_type]
+QED
+*)
+
+        
 val _ = export_theory();
 
