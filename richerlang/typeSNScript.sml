@@ -31,8 +31,9 @@ Definition sn_exec_def:
 End
 
 Definition sn_e_def:
-  sn_e G t e ⇔
-    ∀ E. envsn (DRESTRICT G (FDOM E)) E ⇒ sn_exec t E e
+  (* (sn_e G (fnT t1 t2) (Fn s e) ⇔
+     ∀ E. envsn (DRESTRICT G (FDOM E)) E ⇒ sn_exec (fnT t1 t2) E (Fn s e)) ∧ *)
+  sn_e G t e ⇔ ∀ E. envsn (DRESTRICT G (free_vars e)) E ⇒ sn_exec t E e
 End
 
 Theorem envsn_g_domsub_update:
@@ -42,12 +43,49 @@ Proof
   rw[envsn_def] >> Cases_on ‘s = s'’ >> gvs[FLOOKUP_SIMP, DOMSUB_FLOOKUP_NEQ]
 QED
 
+Theorem envsn_fdom_subset:
+  envsn G E ⇒ FDOM G ⊆ FDOM E
+Proof
+  rw[envsn_def, SUBSET_DEF, TO_FLOOKUP] >> metis_tac[option_CLAUSES]
+QED
+
+(* utils *)
+Theorem flookup_submap_rev:
+  f ⊑ g ∧ k ∈ FDOM f ∧ FLOOKUP g k = SOME v ⇒ FLOOKUP f k = SOME v
+Proof
+  rw[FLOOKUP_DEF, SUBMAP_DEF]
+QED
+
+Theorem envsn_e_submap:
+  envsn G E ∧ E' ⊑ E ∧ FDOM G ⊆ FDOM E' ⇒ envsn G E'
+Proof
+  rw[envsn_def] >> ‘s ∈ FDOM E'’ by gvs[FLOOKUP_DEF, SUBSET_DEF] >>
+  rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >>
+  metis_tac[flookup_submap_rev]
+QED
+
+(* utils *)
+Theorem subset_inter_same:
+  A ∩ C ⊆ B ⇒ A ∩ C ⊆ B ∩ C
+Proof
+  rw[INTER_DEF, SUBSET_DEF]
+QED
+
+(* utils *)
+Theorem subset_inter_same2:
+  B ⊆ C ⇒ A ∩ B ⊆ A ∩ C
+Proof
+  rw[INTER_DEF, SUBSET_DEF]
+QED
+
+(*        
 (* utils *)
 Theorem drestrict_insert_domsub:
   DRESTRICT G (s INSERT A) \\ s = DRESTRICT G (A DIFF {s})
 Proof
   rw[DRESTRICT_DOMSUB, DELETE_DEF, INSERT_DIFF]
 QED
+*)
 
 Theorem envsn_g_submap:
   envsn G E ∧ G' ⊑ G ⇒ envsn G' E
@@ -55,6 +93,7 @@ Proof
   rw[envsn_def, SUBMAP_FLOOKUP_EQN]
 QED
 
+(*
 Theorem envsn_drestrict_submap:
   envsn (DRESTRICT G (FDOM E)) E ∧ E' ⊑ E ⇒
   envsn (DRESTRICT G (FDOM E')) E'
@@ -66,18 +105,75 @@ Proof
   ‘s ∈ FDOM E'’ by gvs[FLOOKUP_DEF, IN_INTER, FDOM_DRESTRICT] >>
   metis_tac[FLOOKUP_DEF, SUBMAP_FLOOKUP_EQN]
 QED
+*)
+
+Theorem sn_v_intT:
+  ∀ v. sn_v intT v ⇔
+         ∃ n. v = IntV n
+Proof
+  Cases_on ‘v’ >> gvs[sn_v_def]
+QED
+
+Theorem sn_v_strT:
+  ∀ v. sn_v strT v ⇔
+         ∃ s. v = StrV s
+Proof
+  Cases_on ‘v’ >> gvs[sn_v_def]
+QED
+
+Theorem sn_v_boolT:
+  ∀ v. sn_v boolT v ⇔
+         ∃ b. v = BoolV b
+Proof
+  Cases_on ‘v’ >> gvs[sn_v_def]
+QED
+
+Theorem bop_sn_lemma:
+  ∀ bop v1 v2 ty. sn_v t1 v1 ∧ sn_v t2 v2 ∧ boptype bop t1 t2 ty ⇒
+                  (∃ v. eval_bop bop v1 v2 = Value v ∧ sn_v ty v) ∨
+                  (∃ exn. eval_bop bop v1 v2 = Exn exn)
+Proof
+  rw[boptype_cases] >> gvs[sn_v_intT, sn_v_strT, sn_v_boolT, PULL_EXISTS, eval_bop_def, binIop_def, binSop_def, AllCaseEqs(), sn_v_def]
+QED
 
 Theorem sn_lemma:
-  (* ∀ G e t. typecheck G e t ∧ free_vars e = FDOM G ⇒ sn_e G t e *)
   ∀ G e t. typecheck G e t ⇒ sn_e G t e
 Proof
-  Induct_on ‘typecheck’ >> rw[sn_e_def, sn_v_def, eval_exp_def] >> gvs[AllCaseEqs(), PULL_EXISTS, result_bind_eq_value, sn_exec_def] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >~
+  Induct_on ‘typecheck’ >> rw[sn_e_def, sn_v_def, eval_exp_def] >> gvs[AllCaseEqs(), PULL_EXISTS, result_bind_eq_value, sn_exec_def] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac)
+  >- (rw[eval_exp_def] >> gvs[AllCaseEqs(), FLOOKUP_SIMP, envsn_def]) >~
   [‘Fn s e’, ‘fnT dt rt’]
   >- (rw[eval_exp_def] >> simp[sn_v_def] >> rpt strip_tac >> first_x_assum irule >>
-      simp[FLOOKUP_SIMP] >> rw[AllCaseEqs()] >> irule envsn_g_domsub_update >>
-     )
+      ‘FDOM (DRESTRICT G (free_vars e DIFF {s})) ⊆ FDOM (DRESTRICT E (free_vars e))’ suffices_by metis_tac[envsn_g_domsub_update, DOMSUB_FUPDATE, DRESTRICT_DOMSUB, DELETE_DEF, DRESTRICT_SUBMAP, envsn_e_submap] >>
+      metis_tac[FDOM_DRESTRICT, subset_inter_same, envsn_fdom_subset, DIFF_SUBSET, subset_inter_same2, SUBSET_TRANS]) >~
+  [‘typecheck G ge boolT’]
+  >- (rw[eval_exp_def] >>
+      ‘envsn (DRESTRICT G (free_vars ge)) E ∧ envsn (DRESTRICT G (free_vars e')) E ∧ envsn (DRESTRICT G (free_vars e'')) E’ by metis_tac[envsn_g_submap, DRESTRICT_SUBSET_SUBMAP, SUBSET_UNION] >>
+      rpt (first_x_assum $ drule_all_then $ strip_assume_tac)
+      >- (Cases_on ‘v''’ >> gvs[sn_v_def] >> disj1_tac >> qexists ‘cl+cl'+cl''’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[] >> metis_tac[])
+      >- (disj2_tac >> qexists ‘cl''’ >> simp[])
+      >- (Cases_on ‘v'’ >> gvs[sn_v_def] >> Cases_on ‘b’
+          >- (disj2_tac >> qexists ‘cl''+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[] >> metis_tac[])
+          >> disj1_tac >> qexists ‘cl''+cl’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[] >> metis_tac[])
+      >- (disj2_tac >> qexists ‘cl''’ >> simp[])
+      >- (Cases_on ‘v'’ >> gvs[sn_v_def] >> Cases_on ‘b’
+          >- (disj1_tac >> qexists ‘cl''+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[] >> metis_tac[])
+          >> disj2_tac >> qexists ‘cl''+cl’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[] >> metis_tac[])
+      >- (disj2_tac >> qexists ‘cl''’ >> simp[])
+      >- (Cases_on ‘v’ >> gvs[sn_v_def] >> disj2_tac >> qexists ‘cl+cl'+cl''’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[] >> metis_tac[])
+      >> disj2_tac >> qexists ‘cl''’ >> simp[])
+     >>~- ([‘envsn (DRESTRICT G ∅) E’], rw[eval_exp_def, sn_v_def]) >~
+  [‘boptype bop t1 t2’]
+  >- (‘envsn (DRESTRICT G (free_vars e)) E ∧ envsn (DRESTRICT G (free_vars e')) E’ by metis_tac[envsn_g_submap, DRESTRICT_SUBSET_SUBMAP, SUBSET_UNION] >>
+      rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+                                                                   >>~- ([‘Exn exn’], disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+      >> drule bop_sn_lemma >> strip_tac >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac)
+      >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+      >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[]) >~
+  [‘uoptype uop argt ty’]
 
-                                                                                     
+
+
+        
         
   Induct_on ‘typecheck’ >> rw[sn_e_def, envtype_sn_def, sn_v_def, eval_exp_def] >> gvs[AllCaseEqs(), PULL_EXISTS, result_bind_eq_value, sn_exec_def] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac)
   >- (rw[eval_exp_def])
