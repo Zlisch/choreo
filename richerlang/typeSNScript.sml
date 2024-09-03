@@ -158,6 +158,22 @@ Proof
   Cases_on ‘v’ >> gvs[sn_v_def]
 QED
 
+Theorem sn_v_fnT:
+  ∀ v t1 t2. sn_v (fnT t1 t2) v ⇒
+             ∃ s e E. v = Clos s e E ∧
+                      (∀ v0. sn_v t1 v0 ⇒ (∃ cl v'. eval_exp cl (E|+(s,v0)) e = Value v' ∧ sn_v t2 v') ∨
+                                          (∃ cl exn. eval_exp cl (E|+(s,v0)) e = Exn exn))
+Proof
+  Cases_on ‘v’ >> gvs[sn_v_def]
+QED
+
+Theorem sn_v_sumT:
+  ∀ v t1 t2. sn_v (sumT t1 t2) v ⇒
+             ∃ v0. (v = SumLV v0 ∧ sn_v t1 v0) ∨ v = SumRV v0 ∧ sn_v t2 v0
+Proof
+  Cases_on ‘v’ >> gvs[sn_v_def]
+QED
+
 Theorem bop_sn_lemma:
   ∀ bop v1 v2 ty. sn_v t1 v1 ∧ sn_v t2 v2 ∧ boptype bop t1 t2 ty ⇒
                   (∃ v. eval_bop bop v1 v2 = Value v ∧ sn_v ty v) ∨
@@ -241,35 +257,66 @@ Proof
           first_x_assum $ drule_all_then $ strip_assume_tac
           >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
           >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
-      >> disj2_tac >> qexists ‘cl’ >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
-
-
-        
-        
-        
-  Induct_on ‘typecheck’ >> rw[sn_e_def, envtype_sn_def, sn_v_def, eval_exp_def] >> gvs[AllCaseEqs(), PULL_EXISTS, result_bind_eq_value, sn_exec_def] >> rpt (first_x_assum $ drule_all_then $ strip_assume_tac)
-  >- (rw[eval_exp_def])
-  >- (rw[eval_exp_def] >> DISJ1_TAC >> qexists ‘(cl+cl'+ cl'')’ >> rpt (dxrule clock_value_increment) >>
-      simp[] >> Cases_on ‘v''’ >> gvs[sn_v_def, AllCaseEqs()] >> metis_tac[])
-
-  >~ (rw[eval_exp_def] >> DISJ2_TAC >> qexists ‘cl''’ >> simp[]) >~
-  [‘If gd tb eb’, ‘eval_exp gc E gd = Value gv’,
-   ‘eval_exp tc E tb = Exn exn’, ‘eval_exp ec E eb = Value ev’]
-  >- (Cases_on ‘gv’ >> gvs[sn_v_def] >> rename [‘Value (BoolV bv)’] >>
-      Cases_on ‘bv’
-      >- (disj2_tac >> qexists ‘gc+tc’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rw[eval_exp_def])
-      >> (disj1_tac >> qexists ‘gc+ec’ >> rpt (dxrule clock_value_increment) >> rw[eval_exp_def])) >~
-  [‘BinOp bop e1 e2’, ‘eval_exp c1 E e1 = Value v1’, ‘eval_exp c2 E e2 = Value v2’]
-  >- ( Cases_on ‘eval_bop bop v1 v2’
-       >- (disj1_tac >> rw[eval_exp_def] >> qexists ‘c1+c2’ >> rpt (dxrule clock_value_increment) >> rw[])) >~
-  [‘Fn s e’, ‘fnT dt rt’]
-  >- (rw[eval_exp_def] >> simp[sn_v_def] >> rpt strip_tac >> first_x_assum irule >>
-      simp[FLOOKUP_SIMP] >> rw[AllCaseEqs()]
-      >- (rename [‘FLOOKUP G s2 = SOME ty’] >>
-      ‘s2 ∈ FDOM G’ by metis_tac[flookup_thm] >>
-      ‘s2 ∈ free_vars e’ by ASM_SET_TAC [] >>
-      metis_tac[])
-      >> ASM_SET_TAC [])
+      >> disj2_tac >> qexists ‘cl’ >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[]) >~
+  [‘typecheck G e1 (fnT argt ty)’, ‘App e1 e2’]
+  >- (‘envsn (DRESTRICT G (free_vars e1)) E ∧ envsn (DRESTRICT G (free_vars e2)) E’ by metis_tac[envsn_g_submap, DRESTRICT_SUBSET_SUBMAP, SUBSET_UNION] >>
+      rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+      >- (drule sn_v_fnT >> strip_tac >> first_x_assum $ drule_all_then $ strip_assume_tac
+          >- (disj1_tac >> qexists ‘cl+cl'+cl''+1’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+          >> disj2_tac >> qexists ‘cl+cl'+cl''+1’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+      >> disj2_tac >> qexists ‘cl+cl'+1’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[]) >~
+  [‘Case e s1 e1 s2 e2’, ‘s1 ∈ free_vars e1’, ‘s2 ∈ free_vars e2’]
+  >- (‘envsn (DRESTRICT G (free_vars e)) E ∧ envsn (DRESTRICT G (free_vars e1 DIFF {s1})) E ∧ envsn (DRESTRICT G (free_vars e2 DIFF {s2})) E’ by metis_tac[envsn_g_submap, DRESTRICT_SUBSET_SUBMAP, SUBSET_UNION] >>
+      last_x_assum $ drule_all_then $ strip_assume_tac >> rw[eval_exp_def]
+      >- (drule sn_v_sumT >> strip_tac
+          >- (‘envsn (DRESTRICT G (free_vars e1) |+ (s1,t1)) (E |+ (s1,v0))’ by metis_tac[envsn_update, drestrict_diff_update] >>
+              rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+              >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+              >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+          >> ‘envsn (DRESTRICT G (free_vars e2) |+ (s2,t2)) (E |+ (s2,v0))’ by metis_tac[envsn_update, drestrict_diff_update] >>
+          rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+          >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+          >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+      >> disj2_tac >> qexists ‘cl’ >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[]) >~
+  [‘Case e s1 e1 s2 e2’, ‘s1 ∈ free_vars e1’, ‘s2 ∉ free_vars e2’]
+  >- (‘envsn (DRESTRICT G (free_vars e)) E ∧ envsn (DRESTRICT G (free_vars e1 DIFF {s1})) E ∧ envsn (DRESTRICT G (free_vars e2 DIFF {s2})) E’ by metis_tac[envsn_g_submap, DRESTRICT_SUBSET_SUBMAP, SUBSET_UNION] >>
+      last_x_assum $ drule_all_then $ strip_assume_tac >> rw[eval_exp_def]
+      >- (drule sn_v_sumT >> strip_tac
+          >- (‘envsn (DRESTRICT G (free_vars e1) |+ (s1,t1)) (E |+ (s1,v0))’ by metis_tac[envsn_update, drestrict_diff_update] >>
+              rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+              >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+              >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+          >> ‘envsn (DRESTRICT G (free_vars e2)) (E |+ (s2,v0))’ by metis_tac[DRESTRICT_DOMSUB, DELETE_DEF, envsn_g_domsub, diff_eq_same, envsn_e_submap2, SUBMAP_FUPDATE_FLOOKUP, DOMSUB_FLOOKUP, FUPDATE_PURGE] >>
+          rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+          >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+          >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+      >> disj2_tac >> qexists ‘cl’ >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[]) >~
+  [‘Case e s1 e1 s2 e2’, ‘s1 ∉ free_vars e1’, ‘s2 ∈ free_vars e2’]
+  >- (‘envsn (DRESTRICT G (free_vars e)) E ∧ envsn (DRESTRICT G (free_vars e1 DIFF {s1})) E ∧ envsn (DRESTRICT G (free_vars e2 DIFF {s2})) E’ by metis_tac[envsn_g_submap, DRESTRICT_SUBSET_SUBMAP, SUBSET_UNION] >>
+      last_x_assum $ drule_all_then $ strip_assume_tac >> rw[eval_exp_def]
+      >- (drule sn_v_sumT >> strip_tac
+          >- (‘envsn (DRESTRICT G (free_vars e1)) (E |+ (s1,v0))’ by metis_tac[DRESTRICT_DOMSUB, DELETE_DEF, envsn_g_domsub, diff_eq_same, envsn_e_submap2, SUBMAP_FUPDATE_FLOOKUP, DOMSUB_FLOOKUP, FUPDATE_PURGE] >>
+              rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+              >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+              >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+          >> ‘envsn (DRESTRICT G (free_vars e2) |+ (s2,t2)) (E |+ (s2,v0))’ by metis_tac[envsn_update, drestrict_diff_update] >>
+              rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+              >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+          >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+      >> disj2_tac >> qexists ‘cl’ >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[]) >~
+  [‘Case e s1 e1 s2 e2’, ‘s1 ∉ free_vars e1’, ‘s2 ∉ free_vars e2’]
+  >> ‘envsn (DRESTRICT G (free_vars e)) E ∧ envsn (DRESTRICT G (free_vars e1 DIFF {s1})) E ∧ envsn (DRESTRICT G (free_vars e2 DIFF {s2})) E’ by metis_tac[envsn_g_submap, DRESTRICT_SUBSET_SUBMAP, SUBSET_UNION] >>
+  last_x_assum $ drule_all_then $ strip_assume_tac >> rw[eval_exp_def]
+  >- (drule sn_v_sumT >> strip_tac
+      >- (‘envsn (DRESTRICT G (free_vars e1)) (E |+ (s1,v0))’ by metis_tac[DRESTRICT_DOMSUB, DELETE_DEF, envsn_g_domsub, diff_eq_same, envsn_e_submap2, SUBMAP_FUPDATE_FLOOKUP, DOMSUB_FLOOKUP, FUPDATE_PURGE] >>
+          rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+          >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+          >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+      >> ‘envsn (DRESTRICT G (free_vars e2)) (E |+ (s2,v0))’ by metis_tac[DRESTRICT_DOMSUB, DELETE_DEF, envsn_g_domsub, diff_eq_same, envsn_e_submap2, SUBMAP_FUPDATE_FLOOKUP, DOMSUB_FLOOKUP, FUPDATE_PURGE] >>
+      rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> rw[eval_exp_def]
+      >- (disj1_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt strip_tac >> gvs[])
+      >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
+  >> disj2_tac >> qexists ‘cl’ >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[]
 QED
 
 (*
