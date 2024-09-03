@@ -39,4 +39,7 @@ Proof
   \\ metis_tac [trans_fix]
 QED
 
+Theorem chor_progress:
+Proof
+
 val _ = export_theory ()

@@ -82,15 +82,6 @@ Proof
   rw[INTER_DEF, SUBSET_DEF]
 QED
 
-(*        
-(* utils *)
-Theorem drestrict_insert_domsub:
-  DRESTRICT G (s INSERT A) \\ s = DRESTRICT G (A DIFF {s})
-Proof
-  rw[DRESTRICT_DOMSUB, DELETE_DEF, INSERT_DIFF]
-QED
-*)
-
 Theorem envsn_g_submap:
   envsn G E ∧ G' ⊑ G ⇒ envsn G' E
 Proof
@@ -108,20 +99,6 @@ Theorem envsn_g_domsub:
 Proof
   rw[envsn_def, DOMSUB_FLOOKUP_THM]
 QED
-
-(*
-Theorem envsn_drestrict_submap:
-  envsn (DRESTRICT G (FDOM E)) E ∧ E' ⊑ E ⇒
-  envsn (DRESTRICT G (FDOM E')) E'
-Proof
-  rw[envsn_def] >>
-  ‘DRESTRICT G (FDOM E') ⊑ DRESTRICT G (FDOM E)’ by rw[SUBMAP_FDOM_SUBSET, DRESTRICT_SUBSET_SUBMAP] >>
-  ‘FLOOKUP (DRESTRICT G (FDOM E)) s = SOME ty’ by gvs[SUBMAP_FLOOKUP_EQN] >>
-  first_x_assum $ drule_all_then $ strip_assume_tac >>
-  ‘s ∈ FDOM E'’ by gvs[FLOOKUP_DEF, IN_INTER, FDOM_DRESTRICT] >>
-  metis_tac[FLOOKUP_DEF, SUBMAP_FLOOKUP_EQN]
-QED
-*)
 
 (* utils *)
 Theorem drestrict_not_in:
@@ -318,22 +295,29 @@ Proof
       >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
   >> disj2_tac >> qexists ‘cl’ >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[]
 QED
-
-(*
-Theorem sn_v_value_type:
-  ∀ ty v. sn_v ty v ⇒ value_type v ty
+        
+Theorem type_has_sn_value:
+  ∀ ty. ∃ v. sn_v ty v
 Proof
-  (* recInduct sn_v_ind >> simp[sn_v_def] >> rw[] >>
-  irule value_type_FnV >> *)
   cheat
 QED
 
-Theorem envtype_sn_envtype:
-  envtype_sn G E ⇒ envtype G E
+Theorem envsn_exists_E:
+  ∀ G. ∃ E. envsn G E
 Proof
-  metis_tac[envtype_sn_def, envtype_def, sn_v_value_type]
+  cheat
 QED
-*)
+
+Theorem richerLang_sn:
+  ∀ G e t. typecheck G e t ⇒ (∃ cl v E. eval_exp cl E e = Value v ∧ sn_v t v) ∨
+                             ∃ cl exn E. eval_exp cl E e = Exn exn
+Proof
+  rw[] >>
+  drule sn_lemma >> strip_tac >>
+  fs[sn_v_def, sn_e_def, sn_exec_def] >>
+  ‘∃ E. envsn (DRESTRICT G (free_vars e)) E’ suffices_by metis_tac[] >>
+  metis_tac[envsn_exists_E]
+QED
 
         
 val _ = export_theory();
