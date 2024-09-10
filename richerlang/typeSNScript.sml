@@ -295,28 +295,15 @@ Proof
       >> disj2_tac >> qexists ‘cl+cl'’ >> rpt (dxrule clock_value_increment) >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[])
   >> disj2_tac >> qexists ‘cl’ >> rpt (dxrule clock_exn_increment) >> rpt strip_tac >> gvs[]
 QED
-        
-Theorem type_has_sn_value:
-  ∀ ty. ∃ v. sn_v ty v
-Proof
-  cheat
-QED
-
-Theorem envsn_exists_E:
-  ∀ G. ∃ E. envsn G E
-Proof
-  cheat
-QED
 
 Theorem richerLang_sn:
-  ∀ G e t. typecheck G e t ⇒ (∃ cl v E. eval_exp cl E e = Value v ∧ sn_v t v) ∨
+  ∀ G e t. typecheck FEMPTY e t ⇒ (∃ cl v E. eval_exp cl E e = Value v ∧ sn_v t v) ∨
                              ∃ cl exn E. eval_exp cl E e = Exn exn
 Proof
   rw[] >>
   drule sn_lemma >> strip_tac >>
-  fs[sn_v_def, sn_e_def, sn_exec_def] >>
-  ‘∃ E. envsn (DRESTRICT G (free_vars e)) E’ suffices_by metis_tac[] >>
-  metis_tac[envsn_exists_E]
+  fs[sn_v_def, sn_e_def, sn_exec_def, envsn_def] >>
+  metis_tac[]
 QED
 
         

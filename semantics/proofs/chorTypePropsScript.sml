@@ -64,5 +64,13 @@ Proof
   Induct_on ‘chorTypecheckOK’ >> rw[no_self_comunication_def]
 QED
 
+Theorem chorTypecheckOK_let_thm:
+  chorTypecheckOK Γ Θ (Let v p e c) ⇔
+    ∃ ety. typecheck (localise Γ p) e ety ∧
+           chorTypecheckOK (Γ |+ ((v,p),ety)) Θ c
+Proof
+  simp[Once chorTypecheckOK_cases]
+QED
+
 val _ = export_theory();
 
