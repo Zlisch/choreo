@@ -182,7 +182,7 @@ Inductive trans:
 
 [~letexn:]
   (∀s v p e c cl exn.
-    eval_exp cl (localise s p) e = Exn exn
+    eval_exp cl (localise s p) e = Exn exn ∧ free_vars e ⊆ FDOM (localise s p)
     ⇒ trans (s,Let v p e c)
             (LLet v p e (Exn exn),[])
             (s, Nil))

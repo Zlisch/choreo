@@ -261,7 +261,7 @@ metis_tac [trans_rules,FLOOKUP_SUBMAP,SUBMAP_mono_FUPDATE
 [‘Let v p e c’, ‘Value ev’]
 >- metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE, trans_letval, eval_bigger_state_fv, submap_localise, SUBMAP_FDOM_SUBSET, SUBSET_TRANS] >~
 [‘Let v p e c’, ‘Exn exn’]
->- metis_tac[eval_bigger_state_exn, trans_letexn] >~
+>- metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE, trans_letexn, eval_bigger_state_exn, submap_localise, SUBMAP_FDOM_SUBSET, SUBSET_TRANS] >~
 [‘IfThen _ _ _ _’, ‘l τ≅ l'’]
 >- ( (* if_swap *) res_tac
      \\ `z' = z''` by metis_tac [trans_state]
