@@ -72,5 +72,7 @@ Proof
   simp[Once chorTypecheckOK_cases]
 QED
 
+(* todo: chorTypecheckOK_no_typeerror *)
+
 val _ = export_theory();
 

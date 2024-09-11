@@ -39,8 +39,6 @@ Definition eval_exp_def:
                                   v1 <- eval_exp c E e1;
                                   v2 <- eval_exp c E e2;
                                   case v1 of
-                                    (* (Clos s e E1) => if s ∈ free_vars e then eval_exp (c-1) (E1 |+ (s,v2)) e
-                                                     else eval_exp (c-1) E e *)
                                     (Clos s e E1) => eval_exp (c-1) (E1 |+ (s,v2)) e
                                   | _ => TypeError
                                 od
@@ -147,7 +145,7 @@ QED
 Theorem diff_eq_same:
   x ∉ A ⇒ A DIFF {x} = A
 Proof
-  cheat
+  ASM_SET_TAC []
 QED
 
 Theorem union_diff_subset_x:
@@ -183,14 +181,39 @@ Proof
   rw[] >> metis_tac[typecheck_env_fv, FDOM_DRESTRICT, SUBSET_INTER, SUBMAP_DRESTRICT, typecheck_env_submap]
 QED
 
+Theorem drestrict_domsub_map:
+  DRESTRICT f s \\ k = DRESTRICT (f \\ k) s
+Proof
+  rw[DRESTRICT_DOMSUB] >> irule $ iffRL $ DRESTRICT_EQ_DRESTRICT >>
+  rw[DELETE_INTER, SET_EQ_SUBSET, SUBSET_DEF, SUBMAP_DEF, DRESTRICT_DEF, DOMSUB_FAPPLY_NEQ]
+QED
+
+Theorem drestrict_fupdate_union:
+  DRESTRICT f r |+ (x,y) = DRESTRICT (f |+ (x,y)) (r ∪ {x})
+Proof
+  gvs[STRONG_DRESTRICT_FUPDATE, DELETE_DEF, DIFF_SAME_UNION] >>
+  ‘DRESTRICT (f \\ x) r |+ (x,y) = DRESTRICT (f \\ x) (r DIFF {x}) |+ (x,y)’ suffices_by metis_tac[FUPDATE_PURGE, drestrict_domsub_map] >>
+  ‘FDOM (DRESTRICT (f \\ x) r) = FDOM (DRESTRICT f r) DIFF {x}’ by metis_tac[drestrict_domsub_map, FDOM_DOMSUB, DELETE_DEF] >>
+  ‘x ∉ FDOM (DRESTRICT (f \\ x) r) ∧ x ∉ FDOM (DRESTRICT (f \\ x) (r DIFF {x}))’ by ASM_SET_TAC[DRESTRICT_DEF] >>
+  ‘DRESTRICT (f \\ x) r = DRESTRICT (f \\ x) (r DIFF {x})’ suffices_by metis_tac[FUPD11_SAME_NEW_KEY] >>
+  irule $ iffRL $ DRESTRICT_EQ_DRESTRICT >>
+  gvs[FDOM_DOMSUB, DELETE_DEF] >>
+  ASM_SET_TAC []
+QED
+
 Theorem typecheck_update_sub_fv:
   envtype G E ∧ typecheck (G |+ (s,ty1)) e ty ⇒
           typecheck (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) \\ s |+ (s,ty1)) e ty
 Proof
   (*
-  Induct_on ‘typecheck’ >> rw[]
-  >- (gvs[FLOOKUP_SIMP, AllCaseEqs(), FDOM_DRESTRICT, envtype_def] >>
-      metis_tac[flookup_thm])
+  rw[] >>
+  ‘FDOM G ∪ {s} ⊆ FDOM E ∪ {s}’ by simp[envtype_fdom, subset_update] >>
+  ‘free_vars e ⊆ FDOM E ∪ {s}’ by metis_tac[typecheck_env_fv, FDOM_FUPDATE, INSERT_SING_UNION, UNION_COMM, SUBSET_TRANS] >>
+  ‘DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) |+ (s,ty1) = DRESTRICT (G |+ (s,ty1)) ((FDOM (DRESTRICT E (free_vars e))) ∪ {s})’ by metis_tac[drestrict_fupdate_union] >>
+  gvs[]
+        
+        
+  envtype_fdom, subset_update, FDOM_FUPDATE, INSERT_SING_UNION
   *)
   cheat
 QED
@@ -389,13 +412,6 @@ Proof
   irule $ iffRL $ SET_EQ_SUBSET >> rw[SUBSET_DEF]
 QED
 
-Theorem drestrict_domsub_map:
-  DRESTRICT f s \\ k = DRESTRICT (f \\ k) s
-Proof
-  rw[DRESTRICT_DOMSUB] >> irule $ iffRL $ DRESTRICT_EQ_DRESTRICT >>
-  rw[DELETE_INTER, SET_EQ_SUBSET, SUBSET_DEF, SUBMAP_DEF, DRESTRICT_DEF, DOMSUB_FAPPLY_NEQ]
-QED
-
 Theorem subset_absortion:
   A ⊆ B ∧ B ⊆ C ⇒
   A ∩ B = A ∩ C
@@ -412,19 +428,16 @@ Proof
   first_x_assum $ drule_then $ strip_assume_tac >> gvs[]
 QED
 
-(* value_type sumv should be ⇔ ? *)
 Theorem eval_sumv_types:
   envtype G E ∧ typecheck G e (sumT t1 t2) ⇒
   (eval_exp cl E e = Value (SumRV v) ⇒ value_type v t2) ∧
   (eval_exp cl E e = Value (SumLV v) ⇒ value_type v t1)
 Proof
-  (*
-  rw[] >> 
-  >- (drule eval_value_type >> strip_tac >>
-      rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >>
-      metis_tac[value_type_SumRV, value_type_SumLV])
-  *)
-  cheat
+  rw[]
+  >- (‘value_type (SumRV v) (sumT t1 t2)’ by metis_tac[eval_value_type] >>
+      gvs[valuetype_EQ_sumT])
+  >> ‘value_type (SumLV v) (sumT t1 t2)’ by metis_tac[eval_value_type] >>
+      gvs[valuetype_EQ_sumT]
 QED
 
 (* based on type soundness *)
@@ -500,18 +513,56 @@ Proof
 QED
 
 Theorem eval_bigger_state_exn:
-  eval_exp cl (localise s p) e = Exn exn ∧
-  free_vars e ⊆ FDOM (localise s p) ∧ s ⊑ z ⇒
-  eval_exp cl (localise z p) e = Exn exn
+  ∀ cl s p ev z. eval_exp cl (localise s p) e = Exn exn ∧
+                 free_vars e ⊆ FDOM (localise s p) ∧ s ⊑ z ⇒
+                 eval_exp cl (localise z p) e = Exn exn
 Proof
-  (* 
   Induct_on ‘e’ >> gvs[eval_exp_def, AllCaseEqs()]
   (* binop *)
-  >- (Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[] >>
-      Cases_on ‘ eval_exp cl (localise s p) e'’ >> gvs[]
-      >- (rpt strip_tac >> gvs[result_bind_def])
-    *)
-  cheat
+  >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[]
+      >- (Cases_on ‘ eval_exp cl (localise s p) e'’ >> gvs[]
+          >- (‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Value a'’ by metis_tac[eval_bigger_state_fv] >>
+              gvs[result_bind_def])
+          >> ‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Exn e''’ by metis_tac[eval_bigger_state_fv] >>
+          gvs[result_bind_def])
+      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv] >>
+      gvs[result_bind_def])
+  (* uop *)
+  >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[]
+      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv] >>
+          gvs[result_bind_def])
+      >> ‘eval_exp cl (localise z p) e = Exn e'’ by metis_tac[eval_bigger_state_fv] >>
+      gvs[result_bind_def])
+  (* if *)
+  >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[]
+      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv] >> Cases_on ‘a’ >> gvs[] >> Cases_on ‘b’ >> gvs[] >>  metis_tac[])
+      >> (‘eval_exp cl (localise z p) e = Exn e'³'’ by metis_tac[eval_bigger_state_fv] >>
+          gvs[result_bind_def]))
+  (* let *)
+  >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s' p) e’ >> gvs[]
+      >- (‘(s' |+ ((s,p),a)) ⊑ (z |+ ((s,p),a))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
+          ‘free_vars e' ⊆ FDOM (localise (s' |+ ((s,p),a)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
+          ‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv] >>
+          gvs[result_bind_def] >> metis_tac[])
+      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv] >>
+      gvs[result_bind_def])
+  (* app *)
+  >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[] >>
+      Cases_on ‘eval_exp cl (localise s p) e'’ >> gvs[]
+      >- (Cases_on ‘a’ >> gvs[] >>
+          ‘eval_exp cl (localise z p) e = Value (Clos s' e'' E) ∧ eval_exp cl (localise z p) e' = Value a'’ by metis_tac[eval_bigger_state_fv] >> gvs[result_bind_def])
+      >- (‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Exn e''’ by metis_tac[eval_bigger_state_fv] >> gvs[result_bind_def])
+      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv] >> gvs[result_bind_def])
+  (* case *)
+  >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s' p) e’ >> gvs[]
+      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv] >> Cases_on ‘a’ >> gvs[]
+          >- (‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
+              ‘free_vars e' ⊆ FDOM (localise (s' |+ ((s0,p),v)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
+              gvs[result_bind_def] >> metis_tac[])
+          >> ‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
+          ‘free_vars e'' ⊆ FDOM (localise (s' |+ ((s,p),v)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
+          gvs[result_bind_def] >> metis_tac[])
+      >> ‘eval_exp cl (localise z p) e = Exn e'³'’ by metis_tac[eval_bigger_state_fv] >> gvs[result_bind_def])
 QED
 
 Theorem eval_val_neq:
