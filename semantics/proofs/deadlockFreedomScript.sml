@@ -1,6 +1,6 @@
 open preamble choreoUtilsTheory chorSemTheory chorPropsTheory chorTypePropsTheory chorTypeTheory
 
-open typeSNTheory                                
+open typeSNTheory envSemTheory richerLangTheory
 
 val _ = new_theory "deadlockFreedom";
 
@@ -59,7 +59,7 @@ Proof
   metis_tac[envsn_g_submap, DRESTRICT_SUBMAP, sn_exec_def]        
 QED
 
-Theorem chor_progress:
+Theorem chor_progress_lemma:
   ∀c s. chorTypecheckOK Γ Θ c ∧ chorEnvtype Γ s ∧ chorEnvsn Γ s ⇒
         ∃τ l s' c'. trans (s,c) (τ,l) (s',c') ∨ ¬not_finish c
 Proof
@@ -90,6 +90,14 @@ Proof
   >- metis_tac [trans_sel,no_self_comunication_def]
   (* Recursion *)
   \\ metis_tac [trans_fix]
+QED
+
+Theorem chor_progress:
+  ∀ c. chorTypecheckOK FEMPTY Θ c ⇒
+         ∃τ l s' c'. trans (FEMPTY,c) (τ,l) (s',c') ∨ ¬not_finish c
+Proof
+  rpt strip_tac >> drule_then irule chor_progress_lemma >>
+  rw[chorEnvsn_def, chorEnvtype_def, envsn_def, envtype_def, localise_def]
 QED
 
 val _ = export_theory ()

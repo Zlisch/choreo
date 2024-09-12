@@ -340,16 +340,26 @@ Proof
      ‘eval_exp cl (localise s p) e = Value x’ by metis_tac[clock_value_increment] >> gvs[])
 QED
 
-Theorem localise_fdom:
+Theorem localise_fdom[simp]:
   FDOM (localise s p) = {x | (x,p) ∈ FDOM s}
 Proof
-  cheat
+  simp[localise_def] >>
+  dep_rewrite.DEP_REWRITE_TAC [FDOM_f_o] >>
+  irule SUBSET_FINITE >>
+  qexists ‘IMAGE FST (FDOM s)’ >>
+  simp[] >> simp[SUBSET_DEF, pairTheory.EXISTS_PROD] >>
+  metis_tac[]
 QED
 
 Theorem localise_fapply:
-  (localise s p) ' x = s ' (x,p)
+   x ∈ FDOM (localise s p) ⇒ (localise s p) ' x = s ' (x,p)
 Proof
-  cheat
+  simp[localise_def] >> strip_tac >>
+  dep_rewrite.DEP_REWRITE_TAC [FAPPLY_f_o] >>
+  simp[] >> irule SUBSET_FINITE >>
+  qexists ‘IMAGE FST (FDOM s)’ >>
+  simp[] >> simp[SUBSET_DEF, pairTheory.EXISTS_PROD] >>
+  metis_tac[]
 QED
 
 Theorem localise_update_eqn:
@@ -368,7 +378,7 @@ QED
 Theorem submap_localise:
   s ⊑ z ⇒ localise s p ⊑ localise z p
 Proof
-  rw[SUBMAP_DEF, localise_fdom] >> metis_tac[localise_fapply]
+  simp[SUBMAP_DEF, localise_fdom, localise_fapply]
 QED
 
 Theorem subset_fdom_localise_state:
@@ -381,7 +391,8 @@ Theorem localise_fdom_subset:
   (∀ p. FDOM (localise Γ p) ⊆ FDOM (localise Δ p)) ⇒
   FDOM Γ ⊆ FDOM Δ
 Proof
-  cheat
+  rw[SUBSET_DEF] >>
+  Cases_on ‘x’ >> simp[]
 QED
 
 Theorem envtype_fdom:
