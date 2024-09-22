@@ -259,9 +259,9 @@ metis_tac [trans_rules,FLOOKUP_SUBMAP,SUBMAP_mono_FUPDATE
 \\ ho_match_mp_tac trans_pairind
 \\ rw []  >~
 [‘Let v p e c’, ‘Value ev’]
->- metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE, trans_letval, eval_bigger_state_fv, submap_localise, SUBMAP_FDOM_SUBSET, SUBSET_TRANS] >~
+>- metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE, trans_letval, eval_bigger_state_fv, submap_localise, SUBMAP_FDOM_SUBSET, SUBSET_TRANS, localise_fdom] >~
 [‘Let v p e c’, ‘Exn exn’]
->- metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE, trans_letexn, eval_bigger_state_exn, submap_localise, SUBMAP_FDOM_SUBSET, SUBSET_TRANS] >~
+>- metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE, trans_letexn, eval_bigger_state_exn, submap_localise, SUBMAP_FDOM_SUBSET, SUBSET_TRANS, localise_fdom] >~
 [‘IfThen _ _ _ _’, ‘l τ≅ l'’]
 >- ( (* if_swap *) res_tac
      \\ `z' = z''` by metis_tac [trans_state]
