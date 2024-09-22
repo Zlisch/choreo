@@ -205,17 +205,11 @@ Theorem typecheck_update_sub_fv:
   envtype G E ∧ typecheck (G |+ (s,ty1)) e ty ⇒
           typecheck (DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) \\ s |+ (s,ty1)) e ty
 Proof
-  (*
   rw[] >>
-  ‘FDOM G ∪ {s} ⊆ FDOM E ∪ {s}’ by simp[envtype_fdom, subset_update] >>
-  ‘free_vars e ⊆ FDOM E ∪ {s}’ by metis_tac[typecheck_env_fv, FDOM_FUPDATE, INSERT_SING_UNION, UNION_COMM, SUBSET_TRANS] >>
+  ‘free_vars e ⊆ FDOM E ∪ {s}’ by metis_tac[envtype_fdom, subset_update, typecheck_env_fv, FDOM_FUPDATE, INSERT_SING_UNION, UNION_COMM, SUBSET_TRANS] >>
   ‘DRESTRICT G (FDOM (DRESTRICT E (free_vars e))) |+ (s,ty1) = DRESTRICT (G |+ (s,ty1)) ((FDOM (DRESTRICT E (free_vars e))) ∪ {s})’ by metis_tac[drestrict_fupdate_union] >>
-  gvs[]
-        
-        
-  envtype_fdom, subset_update, FDOM_FUPDATE, INSERT_SING_UNION
-  *)
-  cheat
+  ‘free_vars e ⊆ (FDOM (DRESTRICT E (free_vars e)) ∪ {s})’ suffices_by metis_tac[typecheck_drestrict] >>
+  ASM_SET_TAC[FDOM_DRESTRICT, SUBSET_INTER1]
 QED
 
 Theorem type_soundness:
@@ -356,10 +350,9 @@ Theorem localise_fapply:
 Proof
   simp[localise_def] >> strip_tac >>
   dep_rewrite.DEP_REWRITE_TAC [FAPPLY_f_o] >>
-  simp[] >> irule SUBSET_FINITE >>
-  qexists ‘IMAGE FST (FDOM s)’ >>
-  simp[] >> simp[SUBSET_DEF, pairTheory.EXISTS_PROD] >>
-  metis_tac[]
+  simp[] >> ‘FINITE {vn | (vn,p) ∈ FDOM s}’ suffices_by gvs[FDOM_f_o] >>
+  irule SUBSET_FINITE >> qexists ‘IMAGE FST (FDOM s)’ >> simp[] >>
+  simp[SUBSET_DEF, pairTheory.EXISTS_PROD] >> metis_tac[]
 QED
 
 Theorem localise_update_eqn:
@@ -462,8 +455,10 @@ Proof
   >- (rpt strip_tac >>
       ‘(free_vars e DIFF {s}) ⊆ FDOM (localise s' p)’ by metis_tac[eval_no_undefined_vars, free_vars] >> rw[eval_exp_def] >>
       ‘DRESTRICT (localise s' p) (free_vars e) \\ s = DRESTRICT (localise z p) (free_vars e) \\ s’ by (rw[drestrict_domsub_map] >> irule $ iffRL $ DRESTRICT_EQ_DRESTRICT_SAME >>
-  ‘localise s' p ⊑ localise z p’ by simp[submap_localise] >> rw [] >>
-  metis_tac[DOMSUB_FAPPLY_NEQ, SUBMAP_DEF, delete_inter_eq, DELETE_DEF, SUBMAP_FDOM_SUBSET, subset_absortion]) >>
+                                                                                                       ‘localise s' p ⊑ localise z p’ by simp[submap_localise] >> rw []
+                                                                                                       >- gvs[DOMSUB_FAPPLY_NEQ, SUBMAP_DEF]
+                                                                                                       >> ‘{x | (x,p) ∈ FDOM s'} ⊆ {x | (x,p) ∈ FDOM z}’ suffices_by gvs[delete_inter_eq, DELETE_DEF, SUBMAP_FDOM_SUBSET, subset_absortion] >>
+                                                                                                       fs[SUBSET_DEF] >> metis_tac[SUBMAP_FDOM_SUBSET, SUBSET_DEF]) >>
       gvs[eval_exp_def])
   >> rw[eval_exp_def] >> gvs[AllCaseEqs(), result_bind_eq_value, PULL_EXISTS]
   >- metis_tac[submap_localise, FLOOKUP_SUBMAP] >~ 
