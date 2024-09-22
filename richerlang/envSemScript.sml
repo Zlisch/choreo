@@ -84,6 +84,12 @@ Theorem result_bind_eq_typeerr:
 Proof
   Cases_on ‘m’>>simp[]
 QED
+        
+Theorem envtype_fdom:
+  envtype G E ⇒ FDOM G ⊆ FDOM E
+Proof
+  rw[envtype_def, SUBSET_DEF, TO_FLOOKUP] >> metis_tac[option_CLAUSES]
+QED
 
 Theorem envtype_submap:
   envtype G E ∧ G' ⊑ G ⇒ envtype G' E
@@ -388,12 +394,6 @@ Proof
   Cases_on ‘x’ >> simp[]
 QED
 
-Theorem envtype_fdom:
-  envtype G E ⇒ FDOM G ⊆ FDOM E
-Proof
-  rw[envtype_def, SUBSET_DEF, TO_FLOOKUP] >> metis_tac[option_CLAUSES]
-QED
-
 (* duplicated to envtype_lemma in richerlangTheory *)
 Theorem envtype_update:
   envtype G E ∧ value_type v t ⇒
@@ -487,8 +487,16 @@ Theorem eval_fn_submap_lemma:
 Proof
   rw[drestrict_domsub_map] >>
   irule $ iffRL $ DRESTRICT_EQ_DRESTRICT_SAME >>
-  ‘localise s' p ⊑ localise z p’ by simp[submap_localise] >> rw [] >>
-  metis_tac[DOMSUB_FAPPLY_NEQ, SUBMAP_DEF, delete_inter_eq, DELETE_DEF, SUBMAP_FDOM_SUBSET, subset_absortion]
+  ‘localise s' p ⊑ localise z p’ by simp[submap_localise] >> rw []
+  >- gvs[DOMSUB_FAPPLY_NEQ, SUBMAP_DEF]
+  >> ‘{x | (x,p) ∈ FDOM s'} ⊆ {x | (x,p) ∈ FDOM z}’ suffices_by gvs[delete_inter_eq, DELETE_DEF, SUBMAP_FDOM_SUBSET, subset_absortion] >>
+  fs[SUBSET_DEF] >> metis_tac[SUBMAP_FDOM_SUBSET, SUBSET_DEF]
+QED
+
+Theorem fst_state_union_update_lemma:
+  {x | (x,p) ∈ FDOM s'} ∪ {s} = {x | (x,p) ∈ (FDOM s' ∪ {(s,p)})}
+Proof
+  ASM_SET_TAC[]
 QED
 
 Theorem eval_bigger_state_fv:
@@ -505,15 +513,15 @@ Proof
   >- metis_tac[submap_localise, FLOOKUP_SUBMAP] >~ 
   [‘Value (SumRV v)’]
   >- (‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
-      ‘free_vars e'' ⊆ FDOM (localise (s' |+ ((s,p),v)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
+      ‘free_vars e'' ⊆ {x | (x,p) ∈ FDOM (s' |+ ((s,p),v))}’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM, fst_state_union_update_lemma] >>
       rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
   [‘Value (SumLV v)’]
   >- (‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
-      ‘free_vars e' ⊆ FDOM (localise (s' |+ ((s0,p),v)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
+      ‘free_vars e' ⊆ {x | (x,p) ∈ FDOM (s' |+ ((s0,p),v))}’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM, fst_state_union_update_lemma] >>
       rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[]) >~
   [‘eval_exp cl (localise s p |+ (vn, v)) body’]
   >- (‘(s |+ ((vn,p),v)) ⊑ (z |+ ((vn,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
-      ‘free_vars body ⊆ FDOM (localise (s |+ ((vn,p),v)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
+      ‘free_vars body ⊆ {x | (x,p) ∈ FDOM (s |+ ((vn,p),v))}’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM, fst_state_union_update_lemma] >>
       rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
   >> (rpt (first_x_assum $ drule_all_then $ strip_assume_tac) >> simp[])
 QED
@@ -527,48 +535,46 @@ Proof
   (* binop *)
   >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[]
       >- (Cases_on ‘ eval_exp cl (localise s p) e'’ >> gvs[]
-          >- (‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Value a'’ by metis_tac[eval_bigger_state_fv] >>
+          >- (‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Value a'’ by metis_tac[eval_bigger_state_fv, localise_fdom] >>
               gvs[result_bind_def])
-          >> ‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Exn e''’ by metis_tac[eval_bigger_state_fv] >>
+          >> ‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Exn e''’ by metis_tac[eval_bigger_state_fv, localise_fdom] >>
           gvs[result_bind_def])
-      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv] >>
+      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv, localise_fdom] >>
       gvs[result_bind_def])
   (* uop *)
   >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[]
-      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv] >>
+      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv, localise_fdom] >>
           gvs[result_bind_def])
-      >> ‘eval_exp cl (localise z p) e = Exn e'’ by metis_tac[eval_bigger_state_fv] >>
+      >> ‘eval_exp cl (localise z p) e = Exn e'’ by metis_tac[eval_bigger_state_fv, localise_fdom] >>
       gvs[result_bind_def])
   (* if *)
   >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[]
-      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv] >> Cases_on ‘a’ >> gvs[] >> Cases_on ‘b’ >> gvs[] >>  metis_tac[])
-      >> (‘eval_exp cl (localise z p) e = Exn e'³'’ by metis_tac[eval_bigger_state_fv] >>
+      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv, localise_fdom] >> Cases_on ‘a’ >> gvs[] >> Cases_on ‘b’ >> gvs[] >>  metis_tac[])
+      >> (‘eval_exp cl (localise z p) e = Exn e'³'’ by metis_tac[eval_bigger_state_fv, localise_fdom] >>
           gvs[result_bind_def]))
   (* let *)
   >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s' p) e’ >> gvs[]
       >- (‘(s' |+ ((s,p),a)) ⊑ (z |+ ((s,p),a))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
-          ‘free_vars e' ⊆ FDOM (localise (s' |+ ((s,p),a)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
-          ‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv] >>
-          gvs[result_bind_def] >> metis_tac[])
-      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv] >>
+          ‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv, localise_fdom] >>
+          gvs[result_bind_def] >>               
+          ‘free_vars e' ⊆ {x | (x,p) ∈ FDOM (s' |+ ((s,p),a))}’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM, fst_state_union_update_lemma] >> metis_tac[])
+      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv, localise_fdom] >>
       gvs[result_bind_def])
   (* app *)
   >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s p) e’ >> gvs[] >>
       Cases_on ‘eval_exp cl (localise s p) e'’ >> gvs[]
       >- (Cases_on ‘a’ >> gvs[] >>
-          ‘eval_exp cl (localise z p) e = Value (Clos s' e'' E) ∧ eval_exp cl (localise z p) e' = Value a'’ by metis_tac[eval_bigger_state_fv] >> gvs[result_bind_def])
-      >- (‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Exn e''’ by metis_tac[eval_bigger_state_fv] >> gvs[result_bind_def])
-      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv] >> gvs[result_bind_def])
+          ‘eval_exp cl (localise z p) e = Value (Clos s' e'' E) ∧ eval_exp cl (localise z p) e' = Value a'’ by metis_tac[eval_bigger_state_fv, localise_fdom] >> gvs[result_bind_def])
+      >- (‘eval_exp cl (localise z p) e = Value a ∧ eval_exp cl (localise z p) e' = Exn e''’ by metis_tac[eval_bigger_state_fv, localise_fdom] >> gvs[result_bind_def])
+      >> ‘eval_exp cl (localise z p) e = Exn e''’ by metis_tac[eval_bigger_state_fv, localise_fdom] >> gvs[result_bind_def])
   (* case *)
   >- (rpt strip_tac >> Cases_on ‘eval_exp cl (localise s' p) e’ >> gvs[]
-      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv] >> Cases_on ‘a’ >> gvs[]
-          >- (‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
-              ‘free_vars e' ⊆ FDOM (localise (s' |+ ((s0,p),v)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
-              gvs[result_bind_def] >> metis_tac[])
-          >> ‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
-          ‘free_vars e'' ⊆ FDOM (localise (s' |+ ((s,p),v)) p)’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM] >>
-          gvs[result_bind_def] >> metis_tac[])
-      >> ‘eval_exp cl (localise z p) e = Exn e'³'’ by metis_tac[eval_bigger_state_fv] >> gvs[result_bind_def])
+      >- (‘eval_exp cl (localise z p) e = Value a’ by metis_tac[eval_bigger_state_fv, localise_fdom] >> Cases_on ‘a’ >> gvs[]
+          >- (gvs[result_bind_def] >> ‘(s' |+ ((s0,p),v)) ⊑ (z |+ ((s0,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >> 
+              ‘free_vars e' ⊆ {x | (x,p) ∈ FDOM (s' |+ ((s0,p),v))}’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM, fst_state_union_update_lemma] >> metis_tac[])
+          >> gvs[result_bind_def] >> ‘(s' |+ ((s,p),v)) ⊑ (z |+ ((s,p),v))’ by metis_tac[submap_domsub2, SUBMAP_mono_FUPDATE] >> gvs[localise_update_eqn] >>
+          ‘free_vars e'' ⊆ {x | (x,p) ∈ FDOM (s' |+ ((s,p),v))}’ by metis_tac[localise_update_eqn, FDOM_FUPDATE, INSERT_SING_UNION, subset_diff_update, UNION_COMM, fst_state_union_update_lemma] >> metis_tac[])
+      >> ‘eval_exp cl (localise z p) e = Exn e'³'’ by metis_tac[eval_bigger_state_fv, localise_fdom] >> gvs[result_bind_def])
 QED
 
 Theorem eval_val_neq:
