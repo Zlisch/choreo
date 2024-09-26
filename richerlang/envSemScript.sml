@@ -361,6 +361,18 @@ Proof
   simp[SUBSET_DEF, pairTheory.EXISTS_PROD] >> metis_tac[]
 QED
 
+Theorem localise_flookup:
+  FLOOKUP (localise s p) x = FLOOKUP s (x,p)
+Proof
+  rw[FLOOKUP_DEF, localise_fapply]
+QED
+
+Theorem localise_fempty:
+  localise FEMPTY p = FEMPTY
+Proof
+  rw[localise_def, f_o_FEMPTY]
+QED
+
 Theorem localise_update_eqn:
   localise s p |+ (vn, v) = localise (s |+ ((vn, p), v)) p
 Proof

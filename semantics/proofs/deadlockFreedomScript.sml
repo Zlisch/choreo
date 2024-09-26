@@ -1,4 +1,4 @@
-open preamble choreoUtilsTheory chorSemTheory chorPropsTheory chorTypePropsTheory chorTypeTheory
+open preamble choreoUtilsTheory chorSemTheory chorPropsTheory chorTypePropsTheory chorTypeTheory chorLangTheory
 
 open typeSNTheory envSemTheory richerLangTheory
 
@@ -98,6 +98,37 @@ Theorem chor_progress:
 Proof
   rpt strip_tac >> drule_then irule chor_progress_lemma >>
   rw[chorEnvsn_def, chorEnvtype_def, envsn_def, envtype_def, localise_def]
+QED
+
+Theorem richerLang_localise_closed_sn:
+  typecheck FEMPTY e t ⇒
+  (∃ cl v. eval_exp cl FEMPTY e = Value v ∧ sn_v t v) ∨
+  ∃ cl exn. eval_exp cl FEMPTY e = Exn exn
+Proof
+  rw[] >> drule sn_lemma >> fs[sn_e_def, sn_exec_def] >>
+  disch_then $ qspecl_then [‘FEMPTY’] assume_tac >> rw[envsn_def]
+QED
+
+(* when a closed c advances we may reach an open c' *)
+Theorem chor_preservation:
+  ∀ c Θ. not_finish c ∧ chorTypecheckOK FEMPTY Θ c ⇒
+         (∃ s' c' τ l Γ. trans (FEMPTY,c) (τ,l) (s',c') ⇒
+                         chorTypecheckOK Γ Θ c')
+Proof
+  Cases >> rw [] >> gvs[chorTypecheckOK_if_thm, chorTypecheckOK_com_thm, chorTypecheckOK_let_thm, chorTypecheckOK_sel_thm, chorTypecheckOK_fix_thm, chorEnvtype_def, envtype_def, localise_flookup, localise_fempty] >~
+  [‘(_,Sel p1 b p2 c)’]
+  >- (drule_all trans_sel >> disch_then $ qspecl_then [‘s’, ‘b’, ‘c’] assume_tac >>
+      metis_tac[]) >~
+  [‘(_,Let v p e c)’]
+  >- (drule richerLang_localise_closed_sn >> strip_tac >>
+      metis_tac[EMPTY_SUBSET, trans_letval, trans_letexn, localise_fempty, FDOM_FEMPTY, typecheck_env_fv, SUBSET_EMPTY, chorTypecheckOK_nil]) >~
+  [‘Fix dn c’]
+  >> (‘trans (s,Fix dn c) (LFix,[]) (s,dsubst c dn (Fix dn c))’ by simp[trans_fix] >>
+      ‘∃ Γ. chorTypecheckOK Γ Θ (dsubst c dn (Fix dn c))’ suffices_by metis_tac[] >>
+      Cases_on ‘c’ >> rw[dsubst_def]
+      >- simp[chorTypecheckOK_nil]
+      >> cheat
+     )     
 QED
 
 val _ = export_theory ()

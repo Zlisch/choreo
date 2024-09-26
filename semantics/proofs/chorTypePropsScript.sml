@@ -72,6 +72,36 @@ Proof
   simp[Once chorTypecheckOK_cases]
 QED
 
+Theorem chorTypecheckOK_if_thm:
+  chorTypecheckOK Γ Θ (IfThen v p c1 c2) ⇔
+    FLOOKUP Γ (v,p) = SOME boolT ∧ chorTypecheckOK Γ Θ c1 ∧
+    chorTypecheckOK Γ Θ c2
+Proof
+  simp[Once chorTypecheckOK_cases]
+QED
+
+Theorem chorTypecheckOK_com_thm:
+  chorTypecheckOK Γ Θ (Com p1 v1 p2 v2 c) ⇔
+    FLOOKUP Γ (v1,p1) = SOME strT ∧ FLOOKUP Γ (v2,p2) = SOME strT ∧
+    {p1; p2} ⊆ Θ ∧ p1 ≠ p2 ∧ chorTypecheckOK Γ Θ c
+Proof
+  simp[Once chorTypecheckOK_cases] >> metis_tac[]
+QED
+
+Theorem chorTypecheckOK_sel_thm:
+  chorTypecheckOK Γ Θ (Sel p1 b p2 c) ⇔
+    {p1; p2} ⊆ Θ ∧ p1 ≠ p2 ∧ chorTypecheckOK Γ Θ c
+Proof
+  simp[Once chorTypecheckOK_cases] >> metis_tac[]
+QED
+
+Theorem chorTypecheckOK_fix_thm:
+  chorTypecheckOK Γ Θ (Fix dn c) ⇔
+    chorTypecheckOK Γ (Θ ∪ {dn}) c
+Proof
+  simp[Once chorTypecheckOK_cases]
+QED
+
 (* todo: chorTypecheckOK_no_typeerror *)
 
 val _ = export_theory();
