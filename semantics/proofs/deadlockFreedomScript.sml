@@ -100,6 +100,7 @@ Proof
   rw[chorEnvsn_def, chorEnvtype_def, envsn_def, envtype_def, localise_def]
 QED
 
+(*
 Theorem richerLang_localise_closed_sn:
   typecheck FEMPTY e t ⇒
   (∃ cl v. eval_exp cl FEMPTY e = Value v ∧ sn_v t v) ∨
@@ -108,9 +109,54 @@ Proof
   rw[] >> drule sn_lemma >> fs[sn_e_def, sn_exec_def] >>
   disch_then $ qspecl_then [‘FEMPTY’] assume_tac >> rw[envsn_def]
 QED
+*)
 
-(* when a closed c advances we may reach an open c' *)
+Theorem envsn_localise_update:
+  envsn (localise Γ p) (localise s p) ∧ sn_v ty v ⇒
+  ∀ vn p'. envsn (localise (Γ |+ ((vn,p'),ty)) p) (localise (s |+ ((vn,p'),v)) p)
+Proof
+  rw[envsn_def, localise_flookup] >> Cases_on ‘(s',p) = (vn, p')’ >>
+  gvs[FLOOKUP_SIMP] >> metis_tac[]
+QED
+
+Theorem chorEnvsn_update:
+  chorEnvsn Γ s ∧ sn_v ty v ⇒
+  ∀vn p. chorEnvsn (Γ |+ ((vn,p),ty)) (s |+ ((vn,p),v))
+Proof
+  rw[chorEnvsn_def] >> metis_tac[envsn_localise_update]
+QED
+
+Theorem fmap_update_duplicate:
+  FLOOKUP f x = SOME v ⇒ f = f |+ (x,v)
+Proof
+  rw[] >> irule (iffRL fmap_eq_flookup) >>
+  metis_tac[FLOOKUP_SIMP]
+QED
+
+Theorem chorEnvsn_state_update:
+  FLOOKUP Γ (vn,p) = SOME ty ∧ sn_v ty v ∧ chorEnvsn Γ s ⇒
+  chorEnvsn Γ (s |+ ((vn,p), v))
+Proof
+  metis_tac[chorEnvsn_def, chorEnvsn_update, fmap_update_duplicate]
+QED
+
+Theorem chorEnvtype_state_update:
+  FLOOKUP Γ (vn,p) = SOME ty ∧ value_type v ty ∧ chorEnvtype Γ s ⇒
+  chorEnvtype Γ (s |+ ((vn,p), v))
+Proof
+  metis_tac[chorEnvtype_def, chortype_update, fmap_update_duplicate]
+QED
+
 Theorem chor_preservation:
+  ∀ c Θ Γ s. not_finish c ∧ chorEnvsn Γ s ∧ chorEnvtype Γ s ∧ chorTypecheckOK Γ Θ c ⇒
+             (∃ s' c' τ l Γ'. trans (s,c) (τ,l) (s',c') ⇒
+                              chorEnvtype Γ' s' ∧ chorEnvsn Γ' s' ∧ chorTypecheckOK Γ' Θ c')
+Proof
+  metis_tac[chorEnvtype_def, envtype_def, localise_flookup, valuetype_EQ_strT, trans_com, value_type_StrV, sn_v_strT, chorEnvsn_state_update, chorEnvtype_state_update]
+QED
+
+(*
+Theorem chor_preservation2:
   ∀ c Θ. not_finish c ∧ chorTypecheckOK FEMPTY Θ c ⇒
          (∃ s' c' τ l Γ. trans (FEMPTY,c) (τ,l) (s',c') ⇒
                          chorTypecheckOK Γ Θ c')
@@ -127,8 +173,9 @@ Proof
       ‘∃ Γ. chorTypecheckOK Γ Θ (dsubst c dn (Fix dn c))’ suffices_by metis_tac[] >>
       Cases_on ‘c’ >> rw[dsubst_def]
       >- simp[chorTypecheckOK_nil]
-      >> cheat
+      >> cheat free_vars_mono
      )     
 QED
+*)
 
 val _ = export_theory ()
