@@ -47,6 +47,12 @@ Definition chorEnvsn_def:
   chorEnvsn Γ Δ = (∀ p. envsn (localise Γ p) (localise Δ p))
 End
 
+Theorem chorEnvsn_localise_fdom:
+  ∀ p. chorEnvsn Γ Δ ⇒ FDOM (localise Γ p) ⊆ FDOM (localise Δ p)
+Proof
+  rw[chorEnvsn_def, envsn_fdom]
+QED
+
 Theorem richerLang_localise_sn:
   chorEnvsn Γ s ∧ typecheck (localise Γ p) e t ⇒
   (∃ cl v. eval_exp cl (localise s p) e = Value v ∧ sn_v t v) ∨
@@ -63,7 +69,7 @@ Theorem chor_progress_lemma:
   ∀c s. chorTypecheckOK Γ Θ c ∧ chorEnvtype Γ s ∧ chorEnvsn Γ s ⇒
         ∃τ l s' c'. trans (s,c) (τ,l) (s',c') ∨ ¬not_finish c
 Proof
-  Cases >> rw [] >> rw [] >>
+  Cases >> rw [] >>
   drule chortype_no_self_communication >> 
   drule chortype_no_undefined_vars >> rpt strip_tac >>
   first_x_assum $ drule_all_then $ strip_assume_tac >~
@@ -100,82 +106,30 @@ Proof
   rw[chorEnvsn_def, chorEnvtype_def, envsn_def, envtype_def, localise_def]
 QED
 
-(*
-Theorem richerLang_localise_closed_sn:
-  typecheck FEMPTY e t ⇒
-  (∃ cl v. eval_exp cl FEMPTY e = Value v ∧ sn_v t v) ∨
-  ∃ cl exn. eval_exp cl FEMPTY e = Exn exn
+Theorem chor_preservation_lemma:
+  ∀ c Θ Γ s. not_finish c ∧ chorEnvsn Γ s ∧ chorEnvtype Γ s ∧ chorTypecheckOK Γ Θ c ⇒
+             (∃ s' c' τ l. trans (s,c) (τ,l) (s',c') ⇒ chorTypecheckOK Γ Θ c')
 Proof
-  rw[] >> drule sn_lemma >> fs[sn_e_def, sn_exec_def] >>
-  disch_then $ qspecl_then [‘FEMPTY’] assume_tac >> rw[envsn_def]
-QED
-*)
-
-Theorem envsn_localise_update:
-  envsn (localise Γ p) (localise s p) ∧ sn_v ty v ⇒
-  ∀ vn p'. envsn (localise (Γ |+ ((vn,p'),ty)) p) (localise (s |+ ((vn,p'),v)) p)
-Proof
-  rw[envsn_def, localise_flookup] >> Cases_on ‘(s',p) = (vn, p')’ >>
-  gvs[FLOOKUP_SIMP] >> metis_tac[]
-QED
-
-Theorem chorEnvsn_update:
-  chorEnvsn Γ s ∧ sn_v ty v ⇒
-  ∀vn p. chorEnvsn (Γ |+ ((vn,p),ty)) (s |+ ((vn,p),v))
-Proof
-  rw[chorEnvsn_def] >> metis_tac[envsn_localise_update]
-QED
-
-Theorem fmap_update_duplicate:
-  FLOOKUP f x = SOME v ⇒ f = f |+ (x,v)
-Proof
-  rw[] >> irule (iffRL fmap_eq_flookup) >>
-  metis_tac[FLOOKUP_SIMP]
-QED
-
-Theorem chorEnvsn_state_update:
-  FLOOKUP Γ (vn,p) = SOME ty ∧ sn_v ty v ∧ chorEnvsn Γ s ⇒
-  chorEnvsn Γ (s |+ ((vn,p), v))
-Proof
-  metis_tac[chorEnvsn_def, chorEnvsn_update, fmap_update_duplicate]
-QED
-
-Theorem chorEnvtype_state_update:
-  FLOOKUP Γ (vn,p) = SOME ty ∧ value_type v ty ∧ chorEnvtype Γ s ⇒
-  chorEnvtype Γ (s |+ ((vn,p), v))
-Proof
-  metis_tac[chorEnvtype_def, chortype_update, fmap_update_duplicate]
+  Cases >> rw [] >> gvs[chorTypecheckOK_if_thm, chorTypecheckOK_com_thm, chorTypecheckOK_let_thm, chorTypecheckOK_sel_thm, chorTypecheckOK_fix_thm, chorEnvtype_def, envtype_def, localise_flookup] >~
+  [‘(s,IfThen v p c1 c2)’]
+  >- metis_tac[valuetype_EQ_boolT, trans_if_true, trans_if_false, chorTypecheckOK_nil] >~
+  [‘(s,Com p1 v1 p2 v2 c)’]
+  >- metis_tac[valuetype_EQ_strT, trans_com] >~
+  [‘(s,Let v p e c)’]
+  >- (drule richerLang_localise_sn >> strip_tac >>
+      metis_tac[trans_letval, trans_letexn, typecheck_env_fv, chorEnvsn_localise_fdom, SUBSET_TRANS, chorTypecheckOK_nil]) >~
+  [‘(s,Sel p1 b p2 c)’]
+  >- metis_tac[trans_sel] >~
+  [‘Fix dn c’]
+  >> cheat
 QED
 
 Theorem chor_preservation:
-  ∀ c Θ Γ s. not_finish c ∧ chorEnvsn Γ s ∧ chorEnvtype Γ s ∧ chorTypecheckOK Γ Θ c ⇒
-             (∃ s' c' τ l Γ'. trans (s,c) (τ,l) (s',c') ⇒
-                              chorEnvtype Γ' s' ∧ chorEnvsn Γ' s' ∧ chorTypecheckOK Γ' Θ c')
+  ∀ c. not_finish c ∧ chorTypecheckOK FEMPTY Θ c ⇒
+       (∃ s' c' τ l. trans (s,c) (τ,l) (s',c') ⇒ chorTypecheckOK FEMPTY Θ c')
 Proof
-  metis_tac[chorEnvtype_def, envtype_def, localise_flookup, valuetype_EQ_strT, trans_com, value_type_StrV, sn_v_strT, chorEnvsn_state_update, chorEnvtype_state_update]
+  rpt strip_tac >> drule_then irule chor_preservation_lemma >>
+  rw[chorEnvsn_def, chorEnvtype_def, envsn_def, envtype_def, localise_def]
 QED
-
-(*
-Theorem chor_preservation2:
-  ∀ c Θ. not_finish c ∧ chorTypecheckOK FEMPTY Θ c ⇒
-         (∃ s' c' τ l Γ. trans (FEMPTY,c) (τ,l) (s',c') ⇒
-                         chorTypecheckOK Γ Θ c')
-Proof
-  Cases >> rw [] >> gvs[chorTypecheckOK_if_thm, chorTypecheckOK_com_thm, chorTypecheckOK_let_thm, chorTypecheckOK_sel_thm, chorTypecheckOK_fix_thm, chorEnvtype_def, envtype_def, localise_flookup, localise_fempty] >~
-  [‘(_,Sel p1 b p2 c)’]
-  >- (drule_all trans_sel >> disch_then $ qspecl_then [‘s’, ‘b’, ‘c’] assume_tac >>
-      metis_tac[]) >~
-  [‘(_,Let v p e c)’]
-  >- (drule richerLang_localise_closed_sn >> strip_tac >>
-      metis_tac[EMPTY_SUBSET, trans_letval, trans_letexn, localise_fempty, FDOM_FEMPTY, typecheck_env_fv, SUBSET_EMPTY, chorTypecheckOK_nil]) >~
-  [‘Fix dn c’]
-  >> (‘trans (s,Fix dn c) (LFix,[]) (s,dsubst c dn (Fix dn c))’ by simp[trans_fix] >>
-      ‘∃ Γ. chorTypecheckOK Γ Θ (dsubst c dn (Fix dn c))’ suffices_by metis_tac[] >>
-      Cases_on ‘c’ >> rw[dsubst_def]
-      >- simp[chorTypecheckOK_nil]
-      >> cheat free_vars_mono
-     )     
-QED
-*)
 
 val _ = export_theory ()

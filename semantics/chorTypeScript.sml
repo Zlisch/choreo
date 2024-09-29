@@ -18,7 +18,8 @@ Inductive chorTypecheckOK:
                         chorTypecheckOK Γ Θ c1 ∧ chorTypecheckOK Γ Θ c2 ⇒
                         chorTypecheckOK Γ Θ (IfThen v p c1 c2)
 [~let:] ∀ Γ Θ v p e c ety. typecheck (localise Γ p) e ety ∧
-                           chorTypecheckOK (Γ |+ ((v,p), ety)) Θ c ⇒
+                           FLOOKUP Γ (v,p) = SOME ety ∧
+                           chorTypecheckOK Γ Θ c ⇒
                            chorTypecheckOK Γ Θ (Let v p e c)
 [~fix:] ∀ Γ Θ c dn. chorTypecheckOK Γ (Θ ∪ {dn}) c ⇒ chorTypecheckOK Γ Θ (Fix dn c)
 [~call:] ∀ Γ Θ dn. {dn} ⊆ Θ ⇒ chorTypecheckOK Γ Θ (Call dn)

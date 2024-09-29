@@ -67,9 +67,10 @@ QED
 Theorem chorTypecheckOK_let_thm:
   chorTypecheckOK Γ Θ (Let v p e c) ⇔
     ∃ ety. typecheck (localise Γ p) e ety ∧
-           chorTypecheckOK (Γ |+ ((v,p),ety)) Θ c
+           chorTypecheckOK Γ Θ c ∧
+           FLOOKUP Γ (v,p) = SOME ety
 Proof
-  simp[Once chorTypecheckOK_cases]
+  simp[Once chorTypecheckOK_cases] >> metis_tac[]
 QED
 
 Theorem chorTypecheckOK_if_thm:

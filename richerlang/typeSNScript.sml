@@ -34,6 +34,12 @@ Definition sn_e_def:
   sn_e G t e ⇔ ∀ E. envsn (DRESTRICT G (free_vars e)) E ⇒ sn_exec t E e
 End
 
+Theorem envsn_fdom:
+  envsn G E ⇒ FDOM G ⊆ FDOM E
+Proof
+  rw[envsn_def, SUBSET_DEF, TO_FLOOKUP] >> metis_tac[option_CLAUSES]
+QED
+
 Theorem envsn_g_domsub_update:
   envsn (G \\ s) E ∧ sn_v ty v ⇒
   envsn (G |+ (s,ty)) (E |+ (s,v))
