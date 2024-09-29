@@ -28,3 +28,7 @@ tutorial/solutions/make_ex
 
 # Emacs backup files
 *~
+
+#git
+.DS_Store
+*/.DS_Store
