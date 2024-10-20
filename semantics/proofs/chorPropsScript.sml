@@ -1162,4 +1162,5 @@ Proof
   Induct_on ‘c’ >> rw[free_variables_def,variables_def] >> fs[SUBSET_DEF] >> rw[] >> res_tac
 QED
 
+        
 val _ = export_theory ()

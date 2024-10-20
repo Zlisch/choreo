@@ -44,13 +44,25 @@ Proof
   >> metis_tac[value_type_rules]
 QED
 
+Theorem chorTypecheckOK_env_fv:
+  chorTypecheckOK Γ Θ c ⇒ free_variables c ⊆ FDOM Γ
+Proof
+  Induct_on ‘chorTypecheckOK’ >> rw[free_variables_def, DELETE_DEF] >>
+  gvs[FLOOKUP_DEF] >~
+  [‘typecheck _ _ _’]
+  >- (‘free_vars e ⊆ {x | (x,p) ∈ FDOM Γ}’ by metis_tac[typecheck_env_fv, localise_fdom] >>
+      ASM_SET_TAC[])
+  >> metis_tac[INSERT_SING_UNION, UNION_COMM, union_diff_subset_x]
+QED
+
 Theorem chortype_no_undefined_vars:
   ∀ Γ Θ Δ. chorTypecheckOK Γ Θ c ∧ chorEnvtype Γ Δ ⇒
   no_undefined_vars (Δ, c)
 Proof
   Induct_on ‘chorTypecheckOK’ >> rw[no_undefined_vars_def, free_variables_def, Once chorTypecheckOK_cases, FLOOKUP_DEF]
   >- metis_tac[chortype_fdom_subset, SUBSET_DEF]
-  >- ASM_SET_TAC []
+  >- (‘free_variables c ⊆ FDOM Γ ∪ {(v2,p2)}’ by metis_tac[chorTypecheckOK_env_fv, FDOM_FUPDATE, INSERT_SING_UNION, UNION_COMM] >>
+      ‘FDOM Γ ⊆ FDOM Δ’ by simp[chortype_fdom_subset] >> ASM_SET_TAC[])
   >- metis_tac[chortype_fdom_subset, SUBSET_DEF]
   >- metis_tac[typecheck_no_undefined_vars, subset_fdom_localise_state, chortype_localise_fdom, SUBSET_TRANS]
   >> (‘∃ val. value_type val ety’ by simp[type_has_value] >>
@@ -67,8 +79,7 @@ QED
 Theorem chorTypecheckOK_let_thm:
   chorTypecheckOK Γ Θ (Let v p e c) ⇔
     ∃ ety. typecheck (localise Γ p) e ety ∧
-           chorTypecheckOK Γ Θ c ∧
-           FLOOKUP Γ (v,p) = SOME ety
+           chorTypecheckOK (Γ |+ ((v,p), ety)) Θ c
 Proof
   simp[Once chorTypecheckOK_cases] >> metis_tac[]
 QED
@@ -83,8 +94,8 @@ QED
 
 Theorem chorTypecheckOK_com_thm:
   chorTypecheckOK Γ Θ (Com p1 v1 p2 v2 c) ⇔
-    FLOOKUP Γ (v1,p1) = SOME strT ∧ FLOOKUP Γ (v2,p2) = SOME strT ∧
-    {p1; p2} ⊆ Θ ∧ p1 ≠ p2 ∧ chorTypecheckOK Γ Θ c
+    FLOOKUP Γ (v1,p1) = SOME strT ∧ 
+    {p1; p2} ⊆ Θ ∧ p1 ≠ p2 ∧ chorTypecheckOK (Γ |+ ((v2,p2), strT)) Θ c
 Proof
   simp[Once chorTypecheckOK_cases] >> metis_tac[]
 QED
